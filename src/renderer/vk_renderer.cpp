@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-constexpr bool bUseValidationLayers = false;
+constexpr bool useValidationLayers = false;
 VulkanRenderer* renderer = nullptr;
 
 VulkanRenderer& VulkanRenderer::Get() {
@@ -65,29 +65,39 @@ void VulkanRenderer::cleanup() {
 }
 
 void VulkanRenderer::draw() {
-    std::cout << "Drawing" << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::cout << "Drawing frame " << _frameNumber << std::endl;
+    if(stop_rendering) { // Limit FPS when window is minimized.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    _frameNumber++;
 }
 
 void VulkanRenderer::run() {
     std::cout << "Entering main loop" << std::endl;
-    
+
     SDL_Event e;
     bool quit = false;
 
     // Just run a short event loop for testing
-    for (int i = 0; i < 10 && !quit; i++) {
+    while(!quit) {
         // Poll for events
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 quit = true;
                 break;
             }
+
+            if(e.type == SDL_EVENT_WINDOW_MINIMIZED){
+                stop_rendering = true;
+            }
+            if(e.type == SDL_EVENT_WINDOW_RESTORED){
+                stop_rendering = false;
+            }
         }
         
         // Simple delay
-        SDL_Delay(100);
-        std::cout << "Frame " << i << std::endl;
+        draw();
     }
     
     std::cout << "Exiting main loop" << std::endl;
