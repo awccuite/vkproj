@@ -19,6 +19,7 @@ public:
 	// Vulkan device variables
 	VkDevice _device;
 	VkPhysicalDevice _physicalDevice;
+	VkPhysicalDeviceProperties _deviceProperties; // Store device properties including version
 
 	// Swapchain variables
 	VkSwapchainKHR _swapchain;
@@ -31,6 +32,7 @@ public:
 	void cleanup();
 	void draw();
 	void run();
+	void print_vulkan_info(); // Function to print Vulkan version info
 
 private:
 	void init_window();

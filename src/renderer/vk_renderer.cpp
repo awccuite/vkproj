@@ -28,7 +28,24 @@ void VulkanRenderer::init() {
     init_commands();
     init_sync_structures();
     
+    print_vulkan_info();
+    
     _isInitialized = true;
+}
+
+// Function to print Vulkan version information
+void VulkanRenderer::print_vulkan_info() {
+    // Format Vulkan version from device properties
+    uint32_t version = _deviceProperties.apiVersion;
+    uint32_t major = VK_VERSION_MAJOR(version);
+    uint32_t minor = VK_VERSION_MINOR(version);
+    uint32_t patch = VK_VERSION_PATCH(version);
+    
+    std::cout << "------- Vulkan Info -------" << std::endl;
+    std::cout << "Device: " << _deviceProperties.deviceName << std::endl;
+    std::cout << "Vulkan Version: " << major << "." << minor << "." << patch << std::endl;
+    std::cout << "Driver Version: " << _deviceProperties.driverVersion << std::endl;
+    std::cout << "--------------------------" << std::endl;
 }
 
 void VulkanRenderer::init_window() {
@@ -61,6 +78,14 @@ void VulkanRenderer::init_window() {
 }
 
 void VulkanRenderer::init_vulkan() {
+    // Query instance version before creating instance
+    uint32_t instanceVersion = 0;
+    vkEnumerateInstanceVersion(&instanceVersion);
+    std::cout << "System Vulkan Instance Version: " 
+              << VK_VERSION_MAJOR(instanceVersion) << "."
+              << VK_VERSION_MINOR(instanceVersion) << "."
+              << VK_VERSION_PATCH(instanceVersion) << std::endl;
+
     vkb::InstanceBuilder builder;
     auto instance_res = builder.set_app_name("VkProject")
         .request_validation_layers(useValidationLayers)
@@ -93,10 +118,13 @@ void VulkanRenderer::init_vulkan() {
         .select()
         .value();
 
-        vkb::DeviceBuilder device_builder(physical_device);
-        vkb::Device vkbDevice = device_builder.build().value();
-        _device = vkbDevice.device;
-        _physicalDevice = physical_device.physical_device;
+    vkb::DeviceBuilder device_builder(physical_device);
+    vkb::Device vkbDevice = device_builder.build().value();
+    _device = vkbDevice.device;
+    _physicalDevice = physical_device.physical_device;
+    
+    // Get the physical device properties after selecting the device
+    vkGetPhysicalDeviceProperties(_physicalDevice, &_deviceProperties);
 }
 
 void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
@@ -138,6 +166,7 @@ void VulkanRenderer::init_swapchain() {
 void VulkanRenderer::init_commands() {
 
 }
+
 void VulkanRenderer::init_sync_structures() {
 
 }
