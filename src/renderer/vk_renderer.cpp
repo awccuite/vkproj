@@ -68,7 +68,7 @@ void VulkanRenderer::init_vulkan() {
         .use_default_debug_messenger()
         .build();
 
-    vkb::Instance vkbInstance = instance_res.value();
+    auto vkbInstance = instance_res.value();
     _instance = vkbInstance.instance;
     _debugMessenger = vkbInstance.debug_messenger;
 
@@ -97,8 +97,6 @@ void VulkanRenderer::init_vulkan() {
         vkb::Device vkbDevice = device_builder.build().value();
         _device = vkbDevice.device;
         _physicalDevice = physical_device.physical_device;
-
-
 }
 
 void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
@@ -122,7 +120,15 @@ void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
 }
 
 void VulkanRenderer::destroy_swapchain() {
+    vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
+    for(int i = 0; i < _swapchainImageViews.size(); i++) {
+        vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
+    }
+
+    _swapchainImageViews.clear();
+    _swapchainImages.clear();
+    _swapchain = nullptr;
 }
 
 void VulkanRenderer::init_swapchain() {
@@ -138,6 +144,15 @@ void VulkanRenderer::init_sync_structures() {
 
 void VulkanRenderer::cleanup() {
     if(_isInitialized) {
+        destroy_swapchain();
+
+        vkDestroySurfaceKHR(_instance, _surface, nullptr);
+        vkDestroyDevice(_device, nullptr);
+        
+        // Use vk-bootstrap's destroy_debug_utils_messenger function
+        vkb::destroy_debug_utils_messenger(_instance, _debugMessenger);
+        vkDestroyInstance(_instance, nullptr);
+
         if (_window) {
             SDL_DestroyWindow(_window);
             _window = nullptr;
