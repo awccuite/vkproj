@@ -6,7 +6,10 @@
 #include <cassert>
 #include <iostream>
 
-constexpr bool useValidationLayers = false;
+#include "../../vk-bootstrap/src/VkBootstrap.h"
+#include "vulkan/vulkan_core.h"
+
+constexpr bool useValidationLayers = true;
 VulkanRenderer* renderer = nullptr;
 
 VulkanRenderer& VulkanRenderer::Get() {
@@ -19,6 +22,16 @@ void VulkanRenderer::init() {
     assert(renderer == nullptr);
     renderer = this;
 
+    init_window();
+    init_vulkan();
+    init_swapchain();
+    init_commands();
+    init_sync_structures();
+    
+    _isInitialized = true;
+}
+
+void VulkanRenderer::init_window() {
     std::cout << "Initializing SDL" << std::endl;
 
     if (SDL_Init(SDL_INIT_VIDEO) != true) {
@@ -45,8 +58,82 @@ void VulkanRenderer::init() {
     }
 
     std::cout << "Window created successfully" << std::endl;
+}
+
+void VulkanRenderer::init_vulkan() {
+    vkb::InstanceBuilder builder;
+    auto instance_res = builder.set_app_name("VkProject")
+        .request_validation_layers(useValidationLayers)
+        .require_api_version(1, 3, 0)
+        .use_default_debug_messenger()
+        .build();
+
+    vkb::Instance vkbInstance = instance_res.value();
+    _instance = vkbInstance.instance;
+    _debugMessenger = vkbInstance.debug_messenger;
+
+    SDL_Vulkan_CreateSurface(_window, _instance, nullptr, &_surface);
+
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.dynamicRendering = VK_TRUE;
+    features13.synchronization2 = VK_TRUE;
+
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.bufferDeviceAddress = VK_TRUE;
+    features12.descriptorIndexing = VK_TRUE;
     
-    _isInitialized = true;
+    vkb::PhysicalDeviceSelector selector(vkbInstance);
+    vkb::PhysicalDevice physical_device = selector
+        .set_minimum_version(1, 3)
+        .set_required_features_13(features13)
+        .set_required_features_12(features12)
+        .set_surface(_surface)
+        .select()
+        .value();
+
+        vkb::DeviceBuilder device_builder(physical_device);
+        vkb::Device vkbDevice = device_builder.build().value();
+        _device = vkbDevice.device;
+        _physicalDevice = physical_device.physical_device;
+
+
+}
+
+void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
+    vkb::SwapchainBuilder swapchainBuilder(_physicalDevice, _device, _surface);
+
+    _swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+
+    vkb::Swapchain vkbSwapchain = swapchainBuilder
+        .use_default_format_selection()
+        .set_desired_format(VkSurfaceFormatKHR{ .format = _swapchainImageFormat, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
+        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_extent(width, height)
+        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        .build()
+        .value();
+
+        _swapchainExtent = vkbSwapchain.extent;
+        _swapchain = vkbSwapchain.swapchain;
+        _swapchainImages = vkbSwapchain.get_images().value();
+        _swapchainImageViews = vkbSwapchain.get_image_views().value();
+}
+
+void VulkanRenderer::destroy_swapchain() {
+
+}
+
+void VulkanRenderer::init_swapchain() {
+    create_swapchain(_windowExtent.width, _windowExtent.height);
+}
+
+void VulkanRenderer::init_commands() {
+
+}
+void VulkanRenderer::init_sync_structures() {
+
 }
 
 void VulkanRenderer::cleanup() {
@@ -65,8 +152,8 @@ void VulkanRenderer::cleanup() {
 }
 
 void VulkanRenderer::draw() {
-    std::cout << "Drawing frame " << _frameNumber << std::endl;
-    if(stop_rendering) { // Limit FPS when window is minimized.
+    // std::cout << "Drawing frame " << _frameNumber << std::endl;
+    if(stopRendering) { // Limit FPS when window is minimized.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -89,10 +176,10 @@ void VulkanRenderer::run() {
             }
 
             if(e.type == SDL_EVENT_WINDOW_MINIMIZED){
-                stop_rendering = true;
+                stopRendering = true;
             }
             if(e.type == SDL_EVENT_WINDOW_RESTORED){
-                stop_rendering = false;
+                stopRendering = false;
             }
         }
         

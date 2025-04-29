@@ -20,10 +20,13 @@ find_package(PkgConfig REQUIRED)
 # Use pkg-config to find Vulkan
 pkg_check_modules(VULKAN REQUIRED vulkan)
 
+# Convert Windows paths to Unix paths for MSYS2 environment
+string(REPLACE "C:" "/c" VULKAN_INCLUDE_DIRS_UNIX "${VULKAN_INCLUDE_DIRS}")
+
 # Create Vulkan target
 add_library(Vulkan::Vulkan INTERFACE IMPORTED)
 set_target_properties(Vulkan::Vulkan PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${VULKAN_INCLUDE_DIRS}"
+    INTERFACE_INCLUDE_DIRECTORIES "${VULKAN_INCLUDE_DIRS_UNIX}"
     INTERFACE_LINK_LIBRARIES "${VULKAN_LIBRARIES}"
 )
 
@@ -45,10 +48,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     "${VULKAN_SDK_PATH}/Include"
     src/renderer
     ${SDL3_INCLUDE_DIRS}
-    "C:/msys64/mingw64/include/c++/14.2.0"
-    "C:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32"
-    "C:/msys64/mingw64/include/c++/14.2.0/backward"
-    "C:/msys64/mingw64/include"
+    "/c/msys64/mingw64/include/c++/14.2.0"
+    "/c/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32"
+    "/c/msys64/mingw64/include/c++/14.2.0/backward"
+    "/c/msys64/mingw64/include"
 )
 
 # Link libraries

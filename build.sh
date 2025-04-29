@@ -10,7 +10,7 @@ cd build
 # Configure with the toolchain file
 echo "Running CMake configuration..."
 cmake -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_TOOLCHAIN_FILE=../mingw-clang-toolchain.cmake \
+      -DCMAKE_TOOLCHAIN_FILE=../mingw-gcc-toolchain.cmake \
       -DCMAKE_VERBOSE_MAKEFILE=ON \
       ..
 
