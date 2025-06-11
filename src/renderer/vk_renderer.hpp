@@ -2,6 +2,9 @@
 
 #include "vk_include.hpp"
 
+#include <vector>
+#include <string>
+
 class VulkanRenderer {
 public:
     static VulkanRenderer& Get(); // Singleton renderer get
@@ -13,7 +16,7 @@ public:
 
 	// Window variables
 	VkExtent2D _windowExtent{ 1700 , 900 };
-    SDL_Window* _window; // SDl window forward declaration
+    SDL_Window* _window;
 	VkSurfaceKHR _surface;
 
 	// Vulkan device variables
@@ -43,6 +46,10 @@ private:
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
+
+	const int VK_VERSION_MAJOR_MIN = 1;
+	const int VK_VERSION_MINOR_MIN = 3;
+	const int VK_VERSION_PATCH_MIN = 0;
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debugMessenger;

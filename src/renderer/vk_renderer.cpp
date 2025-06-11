@@ -87,13 +87,13 @@ void VulkanRenderer::init_vulkan() {
               << VK_VERSION_PATCH(instanceVersion) << std::endl;
 
     vkb::InstanceBuilder builder;
-    auto instance_res = builder.set_app_name("VkProject")
+    auto instance_result = builder.set_app_name("VkProject")
         .request_validation_layers(useValidationLayers)
-        .require_api_version(1, 3, 0)
+        .require_api_version(VK_VERSION_MAJOR_MIN, VK_VERSION_MINOR_MIN, VK_VERSION_PATCH_MIN)
         .use_default_debug_messenger()
         .build();
 
-    auto vkbInstance = instance_res.value();
+    auto vkbInstance = instance_result.value();
     _instance = vkbInstance.instance;
     _debugMessenger = vkbInstance.debug_messenger;
 
