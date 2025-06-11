@@ -9,7 +9,7 @@ public:
 	// Engine control variables
 	bool _isInitialized = false;
 	int _frameNumber = 0;
-	bool stopRendering = false;
+	bool _windowMinizmized = false;
 
 	// Window variables
 	VkExtent2D _windowExtent{ 1700 , 900 };

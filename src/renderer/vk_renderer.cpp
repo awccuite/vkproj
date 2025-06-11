@@ -197,7 +197,7 @@ void VulkanRenderer::cleanup() {
 
 void VulkanRenderer::draw() {
     // std::cout << "Drawing frame " << _frameNumber << std::endl;
-    if(stopRendering) { // Limit FPS when window is minimized.
+    if(_windowMinizmized) { // Limit FPS when window is minimized.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -220,10 +220,12 @@ void VulkanRenderer::run() {
             }
 
             if(e.type == SDL_EVENT_WINDOW_MINIMIZED){
-                stopRendering = true;
+                std::cout << "Window minimized" << std::endl;
+                _windowMinizmized = true;
             }
             if(e.type == SDL_EVENT_WINDOW_RESTORED){
-                stopRendering = false;
+                std::cout << "Window restored" << std::endl;
+                _windowMinizmized = false;
             }
         }
         
