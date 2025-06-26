@@ -40,8 +40,8 @@ add_subdirectory(vk-bootstrap)
 # Add executable
 add_executable(${PROJECT_NAME} src/main.cpp)
 
-add_executable(SDLTest src/sdl_test.cpp)
-target_link_libraries(SDLTest PRIVATE ${SDL3_LIBRARIES})
+# add_executable(SDLTest src/sdl_test.cpp)
+# target_link_libraries(SDLTest PRIVATE ${SDL3_LIBRARIES})
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE

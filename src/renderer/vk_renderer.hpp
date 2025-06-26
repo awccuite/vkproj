@@ -1,18 +1,33 @@
 #pragma once
 
-#include "vk_include.hpp"
+#include "vk_constants.hpp"
 
+#include <cstdint>
 #include <vector>
-#include <string>
+
+namespace VxEngine {
 
 class VulkanRenderer {
 public:
-    static VulkanRenderer& Get(); // Singleton renderer get
+	static VulkanRenderer& Get(); // Singleton renderer get
+
+	// Owned on a per frame basis, which lives in _frames
+    struct FrameData {
+		VkCommandPool _commandPool;
+		VkCommandBuffer _commandBuffer;
+	};
+
+	// Frame data and graphics queues
+	FrameData _frames[LIVE_FRAMES];
+	FrameData& get_current_frame_data() { return _frames[_frameNumber % LIVE_FRAMES]; };
+
+    VkQueue _graphicsQueue;
+	uint32_t _graphicsQueueFamilyIndex;
 	
 	// Engine control variables
 	bool _isInitialized = false;
-	int _frameNumber = 0;
 	bool _windowMinizmized = false;
+	uint64_t _frameNumber = 0;
 
 	// Window variables
 	VkExtent2D _windowExtent{ 1700 , 900 };
@@ -46,11 +61,10 @@ private:
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
-
-	const int VK_VERSION_MAJOR_MIN = 1;
-	const int VK_VERSION_MINOR_MIN = 3;
-	const int VK_VERSION_PATCH_MIN = 0;
+	void destroy_commands();
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debugMessenger;
 };
+
+} // namespace VxEngine

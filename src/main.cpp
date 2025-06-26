@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Starting main" << std::endl;
 
         // Get the renderer singleton and initialize it
-        VulkanRenderer renderer;
+        VxEngine::VulkanRenderer renderer;
         renderer.init();
 
         std::cout << "Running renderer" << std::endl;

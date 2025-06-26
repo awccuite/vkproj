@@ -1,5 +1,5 @@
 #include "vk_renderer.hpp"
-#include "vk_include.hpp"
+#include "vk_constants.hpp"
 
 #include <chrono>
 #include <thread>
@@ -8,6 +8,8 @@
 
 #include "../../vk-bootstrap/src/VkBootstrap.h"
 #include "vulkan/vulkan_core.h"
+
+namespace VxEngine {
 
 constexpr bool useValidationLayers = true;
 VulkanRenderer* renderer = nullptr;
@@ -111,7 +113,7 @@ void VulkanRenderer::init_vulkan() {
     
     vkb::PhysicalDeviceSelector selector(vkbInstance);
     vkb::PhysicalDevice physical_device = selector
-        .set_minimum_version(1, 3)
+        .set_minimum_version(VK_VERSION_MAJOR_MIN, VK_VERSION_MINOR_MIN)
         .set_required_features_13(features13)
         .set_required_features_12(features12)
         .set_surface(_surface)
@@ -122,6 +124,9 @@ void VulkanRenderer::init_vulkan() {
     vkb::Device vkbDevice = device_builder.build().value();
     _device = vkbDevice.device;
     _physicalDevice = physical_device.physical_device;
+
+    _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+    _graphicsQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
     
     // Get the physical device properties after selecting the device
     vkGetPhysicalDeviceProperties(_physicalDevice, &_deviceProperties);
@@ -163,16 +168,51 @@ void VulkanRenderer::init_swapchain() {
     create_swapchain(_windowExtent.width, _windowExtent.height);
 }
 
+// TODO: Understand this better.
 void VulkanRenderer::init_commands() {
+    // Create a command pool for commands to be submitted to the graphics queue via.
+    // Command pool features are enabled via flags. One feature we want is to reset command 
+    // buffers without resetting the pool.
 
+    // Use the same command pool info for all frames.
+    VkCommandPoolCreateInfo commandPoolInfo{};
+    commandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolInfo.pNext = nullptr;
+    commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    commandPoolInfo.queueFamilyIndex = _graphicsQueueFamilyIndex;
+
+    for(int i = 0; i < LIVE_FRAMES; i++) {
+        vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool);
+
+        // Create a command buffer for each frame.
+        VkCommandBufferAllocateInfo commandBufferAllocInfo{};
+        commandBufferAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        commandBufferAllocInfo.pNext = nullptr;
+        commandBufferAllocInfo.commandPool = _frames[i]._commandPool;
+        commandBufferAllocInfo.commandBufferCount = 1;
+        commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+        if(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate command buffer: " + std::to_string(i));
+        }
+    }
 }
 
 void VulkanRenderer::init_sync_structures() {
 
 }
 
+void VulkanRenderer::destroy_commands() {
+    for(int i = 0; i < LIVE_FRAMES; i++) {
+        vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+    }
+}
+
 void VulkanRenderer::cleanup() {
     if(_isInitialized) {
+        vkDeviceWaitIdle(_device);
+        
+        destroy_commands();
         destroy_swapchain();
 
         vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -198,7 +238,7 @@ void VulkanRenderer::cleanup() {
 void VulkanRenderer::draw() {
     // std::cout << "Drawing frame " << _frameNumber << std::endl;
     if(_windowMinizmized) { // Limit FPS when window is minimized.
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(UNFOCUSED_FPS_LIMIT_MS));
     }
 
     _frameNumber++;
@@ -235,3 +275,5 @@ void VulkanRenderer::run() {
     
     std::cout << "Exiting main loop" << std::endl;
 }
+
+} // namespace VxEngine
