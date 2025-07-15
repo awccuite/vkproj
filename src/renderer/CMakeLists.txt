@@ -1,6 +1,7 @@
 add_library(renderer STATIC
     vk_renderer.hpp
     vk_renderer.cpp
+    vx_utils.hpp
 )
 
 # Convert Windows paths to Unix paths if needed

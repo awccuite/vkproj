@@ -1,10 +1,12 @@
 #include "vk_renderer.hpp"
 #include "vk_constants.hpp"
+#include "vx_utils.hpp"
 
 #include <chrono>
 #include <thread>
 #include <cassert>
 #include <iostream>
+#include <cmath>
 
 #include "../../vk-bootstrap/src/VkBootstrap.h"
 #include "vulkan/vulkan_core.h"
@@ -82,7 +84,7 @@ void VulkanRenderer::init_window() {
 void VulkanRenderer::init_vulkan() {
     // Query instance version before creating instance
     uint32_t instanceVersion = 0;
-    vkEnumerateInstanceVersion(&instanceVersion);
+    VX_WARN(vkEnumerateInstanceVersion(&instanceVersion));
     std::cout << "System Vulkan Instance Version: " 
               << VK_VERSION_MAJOR(instanceVersion) << "."
               << VK_VERSION_MINOR(instanceVersion) << "."
@@ -175,36 +177,57 @@ void VulkanRenderer::init_commands() {
     // buffers without resetting the pool.
 
     // Use the same command pool info for all frames.
-    VkCommandPoolCreateInfo commandPoolInfo{};
+    VkCommandPoolCreateInfo commandPoolInfo = {}; // Initialize to zero.
     commandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolInfo.pNext = nullptr;
     commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     commandPoolInfo.queueFamilyIndex = _graphicsQueueFamilyIndex;
 
     for(int i = 0; i < LIVE_FRAMES; i++) {
-        vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool);
+        // Each frame has its own command pool, but they are configured identically.
+        VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
 
         // Create a command buffer for each frame.
-        VkCommandBufferAllocateInfo commandBufferAllocInfo{};
+        VkCommandBufferAllocateInfo commandBufferAllocInfo = {}; // Initialize to zero.
         commandBufferAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         commandBufferAllocInfo.pNext = nullptr;
         commandBufferAllocInfo.commandPool = _frames[i]._commandPool;
         commandBufferAllocInfo.commandBufferCount = 1;
         commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-        if(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate command buffer: " + std::to_string(i));
-        }
+        // Allocate a command buffer for each frame in our
+        // _frames[i]._commandBuffer array. This is where frameData is stored.
+        // This is where we will record our commands.
+
+        VX_CHECK(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer));
+    }
+
+    std::cout << "Initialized command structures" << std::endl;
+}
+
+
+
+// Init per frame synchronization structures.
+void VulkanRenderer::init_sync_structures() {
+    // Use constexpr to create compile time constants
+    // that are used to initialize the default fence and semaphore structures.
+    constexpr VkFenceCreateInfo fenceInfo = VxUtils::createFenceInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+    constexpr VkSemaphoreCreateInfo semaphoreInfo = VxUtils::createSemaphoreInfo(0);
+
+    for(int i = 0; i < LIVE_FRAMES; i++) {
+        VX_CHECK(vkCreateFence(_device, &fenceInfo, nullptr, &_frames[i]._inFlightFence));
+        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._swapchainSem));
+        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._renderSem));
     }
 }
 
-void VulkanRenderer::init_sync_structures() {
-
-}
-
-void VulkanRenderer::destroy_commands() {
+void VulkanRenderer::destroy_frame_data() {
     for(int i = 0; i < LIVE_FRAMES; i++) {
         vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+
+        vkDestroyFence(_device, _frames[i]._inFlightFence, nullptr);
+        vkDestroySemaphore(_device, _frames[i]._swapchainSem, nullptr);
+        vkDestroySemaphore(_device, _frames[i]._renderSem, nullptr);
     }
 }
 
@@ -212,7 +235,7 @@ void VulkanRenderer::cleanup() {
     if(_isInitialized) {
         vkDeviceWaitIdle(_device);
         
-        destroy_commands();
+        destroy_frame_data();
         destroy_swapchain();
 
         vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -235,12 +258,53 @@ void VulkanRenderer::cleanup() {
     renderer = nullptr;
 }
 
+constexpr static VkCommandBufferBeginInfo beginCommandBufferInfo(VkCommandBufferUsageFlags flags) {
+    VkCommandBufferBeginInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.pNext = nullptr;
+
+    info.pInheritanceInfo = nullptr;
+    info.flags = flags;
+    return info;
+}
+
 void VulkanRenderer::draw() {
     // std::cout << "Drawing frame " << _frameNumber << std::endl;
     if(_windowMinizmized) { // Limit FPS when window is minimized.
         std::this_thread::sleep_for(std::chrono::milliseconds(UNFOCUSED_FPS_LIMIT_MS));
     }
 
+    // Check the "current frame" (at start of loop, this would be the frame from the previous draw call)
+    // Wait for the fence, then reset it.
+    VX_CHECK(vkWaitForFences(_device, 1, &_frames[_frameNumber % LIVE_FRAMES]._inFlightFence, VK_TRUE, DEFAULT_TIMEOUT_NS));
+    VX_CHECK(vkResetFences(_device, 1, &_frames[_frameNumber % LIVE_FRAMES]._inFlightFence));
+
+    uint32_t swapchainImageIndex;
+    VX_CHECK(vkAcquireNextImageKHR(_device, _swapchain, DEFAULT_TIMEOUT_NS, _frames[_frameNumber % LIVE_FRAMES]._swapchainSem, nullptr, &swapchainImageIndex));
+
+    VkCommandBuffer commandBuffer = get_current_frame_data()._commandBuffer;
+    VX_CHECK(vkResetCommandBuffer(commandBuffer, 0)); // Grab and reset the command buffer for the framedata at index.
+
+    // Begin command buffer
+    constexpr auto commandBufferBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
+
+    // Transition the image layout to a general (unoptimized) layout.
+    VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    float flash = static_cast<float>(std::abs(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / 1000000000.0)));
+    VkClearColorValue clearValue = {{0.0f, 0.0f, flash, 1.0f}};
+
+    VkImageSubresourceRange clearRange = VxUtils::createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    // Clear the image with our clearValue (should sinusoudally change colors per frame)
+    vkCmdClearColorImage(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+
+    // Make the image presentable (Draw with VK_IMAGE_LAYOUT_PRESENT_SRC_KHR), from general layout.
+    VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    VX_CHECK(vkEndCommandBuffer(commandBuffer));
+    // End the command buffer.
+    
     _frameNumber++;
 }
 

@@ -12,9 +12,20 @@ public:
 	static VulkanRenderer& Get(); // Singleton renderer get
 
 	// Owned on a per frame basis, which lives in _frames
+	// Maintains command data as well as synchronization structures.
     struct FrameData {
+		// Command data
 		VkCommandPool _commandPool;
 		VkCommandBuffer _commandBuffer;
+
+		// Synchronization structures
+
+		// Semaphores are used for gpu -> gpu synchronzation
+		// Fences are used for cpu -> gpu synchronization
+
+		VkSemaphore _swapchainSem;
+		VkSemaphore _renderSem;
+		VkFence _inFlightFence;
 	};
 
 	// Frame data and graphics queues
@@ -61,7 +72,7 @@ private:
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
-	void destroy_commands();
+	void destroy_frame_data();
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debugMessenger;
