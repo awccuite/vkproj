@@ -13,7 +13,7 @@
 
 namespace VxEngine {
 
-constexpr bool useValidationLayers = true;
+constexpr bool USE_VALIDATION_LAYERS = true;
 VulkanRenderer* renderer = nullptr;
 
 VulkanRenderer& VulkanRenderer::Get() {
@@ -92,7 +92,7 @@ void VulkanRenderer::init_vulkan() {
 
     vkb::InstanceBuilder builder;
     auto instance_result = builder.set_app_name("VkProject")
-        .request_validation_layers(useValidationLayers)
+        .request_validation_layers(USE_VALIDATION_LAYERS)
         .require_api_version(VK_VERSION_MAJOR_MIN, VK_VERSION_MINOR_MIN, VK_VERSION_PATCH_MIN)
         .use_default_debug_messenger()
         .build();
@@ -293,8 +293,8 @@ void VulkanRenderer::draw() {
     VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    float b = static_cast<float>(std::abs(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / 1000000000.0)));
-    VkClearColorValue clearValue = {{0.0f, 0.0f, b, 1.0f}};
+    float b = static_cast<float>(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / DEFAULT_TIMEOUT_NS) + 1.0f) / 2.0f;
+    VkClearColorValue clearValue = {{0.0f, 0.0f, b , 1.0f}};
 
     VkImageSubresourceRange clearRange = VxUtils::createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     // Clear the image with our clearValue (should sinusoudally change colors per frame)

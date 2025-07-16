@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vk_constants.hpp"
+#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 
 #include <cstdint>
 #include <vector>
@@ -56,6 +57,9 @@ public:
 	VkExtent2D _swapchainExtent;
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
+
+	// Vulkan memory allocator
+	VmaAllocator _allocator;
 	
 	void init();
 	void cleanup();
