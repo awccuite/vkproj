@@ -35,7 +35,7 @@ pkg_check_modules(SDL3 REQUIRED sdl3)
 
 # Add renderer directory
 add_subdirectory(src/renderer)
-add_subdirectory(vk-bootstrap)
+# add_subdirectory(vk-bootstrap)
 
 # Add executable
 add_executable(${PROJECT_NAME} src/main.cpp)

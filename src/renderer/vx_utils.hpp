@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vulkan/vulkan_core.h"
 #include <vulkan/vulkan.h>
 
 namespace VxUtils {
@@ -32,6 +33,46 @@ VkImageSubresourceRange createImageSubresourceRange(VkImageAspectFlags aspectMas
     subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     return subImage;
+}
+
+VkSemaphoreSubmitInfo createSemaphoreSubmitInfo(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore){
+    VkSemaphoreSubmitInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    info.pNext = nullptr;
+    info.semaphore = semaphore;
+    info.stageMask = stageMask;
+    info.deviceIndex = 0;
+    info.value = 1;
+
+    return info;
+}
+
+VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(VkCommandBuffer commandBuffer){
+    VkCommandBufferSubmitInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    info.pNext = nullptr;
+    info.commandBuffer = commandBuffer;
+    info.deviceMask = 0;
+
+    return info;
+}
+
+// Takes in a command buffer info, a signal semaphore info, and a wait semaphore info.
+VkSubmitInfo2 createSubmitInfo2(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo, VkSemaphoreSubmitInfo* waitSemaphoreInfo){
+    VkSubmitInfo2 info = {};
+
+    info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    info.pNext = nullptr;
+    info.waitSemaphoreInfoCount = waitSemaphoreInfo == nullptr ? 0 : 1;
+    info.pWaitSemaphoreInfos = waitSemaphoreInfo;
+
+    info.signalSemaphoreInfoCount = signalSemaphoreInfo == nullptr ? 0 : 1;
+    info.pSignalSemaphoreInfos = signalSemaphoreInfo;
+
+    info.commandBufferInfoCount = 1;
+    info.pCommandBufferInfos = cmd;
+
+    return info;
 }
 
 // Transition image layout from one layout to another.

@@ -4,6 +4,8 @@ add_library(renderer STATIC
     vx_utils.hpp
 )
 
+add_subdirectory(3rdparty/vk-bootstrap)
+
 # Convert Windows paths to Unix paths if needed
 string(REPLACE "C:" "/c" SDL3_INCLUDE_DIRS_UNIX "${SDL3_INCLUDE_DIRS}")
 

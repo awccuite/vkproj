@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cmath>
 
-#include "../../vk-bootstrap/src/VkBootstrap.h"
+#include "3rdparty/vk-bootstrap/src/VkBootstrap.h"
 #include "vulkan/vulkan_core.h"
 
 namespace VxEngine {
@@ -293,8 +293,8 @@ void VulkanRenderer::draw() {
     VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    float flash = static_cast<float>(std::abs(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / 1000000000.0)));
-    VkClearColorValue clearValue = {{0.0f, 0.0f, flash, 1.0f}};
+    float b = static_cast<float>(std::abs(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / 1000000000.0)));
+    VkClearColorValue clearValue = {{0.0f, 0.0f, b, 1.0f}};
 
     VkImageSubresourceRange clearRange = VxUtils::createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     // Clear the image with our clearValue (should sinusoudally change colors per frame)
@@ -304,7 +304,29 @@ void VulkanRenderer::draw() {
     VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     VX_CHECK(vkEndCommandBuffer(commandBuffer));
     // End the command buffer.
+
+    VkCommandBufferSubmitInfo commandBufferSubmitInfo = VxUtils::createCommandBufferSubmitInfo(commandBuffer);
+    // Grab the previous frame's swapchain semaphore to wait on.
+    VkSemaphoreSubmitInfo waitSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, _frames[_frameNumber % LIVE_FRAMES]._swapchainSem);
+    VkSemaphoreSubmitInfo signalSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, _frames[_frameNumber % LIVE_FRAMES]._renderSem);
     
+    VkSubmitInfo2 submitInfo = VxUtils::createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
+    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, _frames[_frameNumber % LIVE_FRAMES]._inFlightFence));
+
+    // Present the image to the screen.
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.pNext = nullptr;
+    presentInfo.pSwapchains = &_swapchain;
+    presentInfo.swapchainCount = 1;
+    
+    presentInfo.pWaitSemaphores = &get_current_frame_data()._renderSem;
+    presentInfo.waitSemaphoreCount = 1;
+
+    presentInfo.pImageIndices = &swapchainImageIndex;
+
+    VX_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
+
     _frameNumber++;
 }
 
