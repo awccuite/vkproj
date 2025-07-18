@@ -2,6 +2,8 @@ add_library(renderer STATIC
     vk_renderer.hpp
     vk_renderer.cpp
     vx_utils.hpp
+    vk_deletionManager.hpp
+    vk_deletionManager.cpp
 )
 
 add_subdirectory(3rdparty/vk-bootstrap)

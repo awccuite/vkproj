@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vk_constants.hpp"
+#include "vk_deletionManager.hpp"
 #include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 
 #include <cstdint>
@@ -27,11 +28,17 @@ public:
 		VkSemaphore _swapchainSem;
 		VkSemaphore _renderSem;
 		VkFence _inFlightFence;
+
+		DeletionManager _deletionManager; // Used to cleanup per frame vulkan objects.
+
+		void cleanup() { 
+			_deletionManager.delete_objects();
+		}
 	};
 
 	// Frame data and graphics queues
 	FrameData _frames[LIVE_FRAMES];
-	FrameData& get_current_frame_data() { return _frames[_frameNumber % LIVE_FRAMES]; };
+	inline FrameData& get_current_frame_data() { return _frames[_frameNumber % LIVE_FRAMES]; };
 
     VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamilyIndex;
@@ -58,11 +65,13 @@ public:
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
 
-	// Vulkan memory allocator
 	VmaAllocator _allocator;
+	DeletionManager _deletionManager; // Used to cleanup vulkan objects created for the renderer.
 	
 	void init();
 	void cleanup();
+    void cleanup_vk_objects();
+
 	void draw();
 	void run();
 	void print_vulkan_info(); // Function to print Vulkan version info

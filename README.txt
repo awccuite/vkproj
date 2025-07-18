@@ -6,3 +6,4 @@ Tested on
     - gcc (14.2)
     - pkgconf
     - cmake (4.0.1)
+    - VulkanMemoryAllocator

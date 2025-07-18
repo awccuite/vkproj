@@ -224,11 +224,16 @@ void VulkanRenderer::init_sync_structures() {
 void VulkanRenderer::destroy_frame_data() {
     for(int i = 0; i < LIVE_FRAMES; i++) {
         vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
-
         vkDestroyFence(_device, _frames[i]._inFlightFence, nullptr);
         vkDestroySemaphore(_device, _frames[i]._swapchainSem, nullptr);
         vkDestroySemaphore(_device, _frames[i]._renderSem, nullptr);
+
+        _frames[i].cleanup();
     }
+}
+
+void VulkanRenderer::cleanup_vk_objects() {
+    _deletionManager.delete_objects();
 }
 
 void VulkanRenderer::cleanup() {
@@ -236,6 +241,7 @@ void VulkanRenderer::cleanup() {
         vkDeviceWaitIdle(_device);
         
         destroy_frame_data();
+        cleanup_vk_objects();
         destroy_swapchain();
 
         vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -276,11 +282,15 @@ void VulkanRenderer::draw() {
 
     // Check the "current frame" (at start of loop, this would be the frame from the previous draw call)
     // Wait for the fence, then reset it.
-    VX_CHECK(vkWaitForFences(_device, 1, &_frames[_frameNumber % LIVE_FRAMES]._inFlightFence, VK_TRUE, DEFAULT_TIMEOUT_NS));
-    VX_CHECK(vkResetFences(_device, 1, &_frames[_frameNumber % LIVE_FRAMES]._inFlightFence));
+    VX_CHECK(vkWaitForFences(_device, 1, &get_current_frame_data()._inFlightFence, VK_TRUE, DEFAULT_TIMEOUT_NS));
+    // After the frame is done, we can reset the fence and delete the frames objects.
+    get_current_frame_data().cleanup();
+
+    // Reset the fence for the current frame.
+    VX_CHECK(vkResetFences(_device, 1, &get_current_frame_data()._inFlightFence));
 
     uint32_t swapchainImageIndex;
-    VX_CHECK(vkAcquireNextImageKHR(_device, _swapchain, DEFAULT_TIMEOUT_NS, _frames[_frameNumber % LIVE_FRAMES]._swapchainSem, nullptr, &swapchainImageIndex));
+    VX_CHECK(vkAcquireNextImageKHR(_device, _swapchain, DEFAULT_TIMEOUT_NS, get_current_frame_data()._swapchainSem, nullptr, &swapchainImageIndex));
 
     VkCommandBuffer commandBuffer = get_current_frame_data()._commandBuffer;
     VX_CHECK(vkResetCommandBuffer(commandBuffer, 0)); // Grab and reset the command buffer for the framedata at index.
@@ -307,11 +317,11 @@ void VulkanRenderer::draw() {
 
     VkCommandBufferSubmitInfo commandBufferSubmitInfo = VxUtils::createCommandBufferSubmitInfo(commandBuffer);
     // Grab the previous frame's swapchain semaphore to wait on.
-    VkSemaphoreSubmitInfo waitSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, _frames[_frameNumber % LIVE_FRAMES]._swapchainSem);
-    VkSemaphoreSubmitInfo signalSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, _frames[_frameNumber % LIVE_FRAMES]._renderSem);
+    VkSemaphoreSubmitInfo waitSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._swapchainSem);
+    VkSemaphoreSubmitInfo signalSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._renderSem);
     
     VkSubmitInfo2 submitInfo = VxUtils::createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
-    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, _frames[_frameNumber % LIVE_FRAMES]._inFlightFence));
+    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, get_current_frame_data()._inFlightFence));
 
     // Present the image to the screen.
     VkPresentInfoKHR presentInfo = {};
