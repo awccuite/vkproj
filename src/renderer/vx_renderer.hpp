@@ -1,8 +1,7 @@
 #pragma once
 
-#include "vk_constants.hpp"
-#include "vk_deletionManager.hpp"
-#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
+#include "vx_deletionManager.hpp"
+#include "vx_utils.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -67,6 +66,10 @@ public:
 
 	VmaAllocator _allocator;
 	DeletionManager _deletionManager; // Used to cleanup vulkan objects created for the renderer.
+
+	// Draw image variables
+	AllocatedImage _drawImage;
+	VkExtent2D _drawExtent;
 	
 	void init();
 	void cleanup();
@@ -83,7 +86,8 @@ private:
 	void init_commands();
 	void init_sync_structures();
 
-	void create_swapchain(uint32_t width, uint32_t height);
+	void create_swapchain(/*uint32_t width, uint32_t height*/);
+	void create_draw_image();
 	void destroy_swapchain();
 	void destroy_frame_data();
 

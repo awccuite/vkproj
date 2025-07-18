@@ -1,9 +1,98 @@
 #pragma once
 
-#include "vulkan/vulkan_core.h"
-#include <vulkan/vulkan.h>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+#include <span>
+#include <array>
+#include <functional>
+#include <deque>
+#include <iostream>
 
-namespace VxUtils {
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vk_enum_string_helper.h>
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+
+// #include <fmt/core.h>
+// #include <glm/mat4x4.hpp>
+// #include <glm/vec4.hpp>
+
+#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
+
+namespace VxEngine {
+
+// Types
+struct AllocatedImage{
+    VkImage image;
+    VkImageView imageView;
+    VmaAllocation allocation;
+    VkExtent3D extent;
+    VkFormat format;
+};
+
+static constexpr uint32_t VK_VERSION_MAJOR_MIN = 1;
+static constexpr uint32_t VK_VERSION_MINOR_MIN = 3;
+static constexpr uint32_t VK_VERSION_PATCH_MIN = 0;
+
+static constexpr uint32_t LIVE_FRAMES = 2; // Maximum number of frames to be preparing at any moment.
+
+static constexpr uint32_t UNFOCUSED_FPS_LIMIT = 10;
+static constexpr uint32_t UNFOCUSED_FPS_LIMIT_MS = 1000/UNFOCUSED_FPS_LIMIT;
+
+static constexpr uint64_t INFINITE_TIMEOUT = UINT64_MAX;
+static constexpr uint64_t DEFAULT_TIMEOUT_NS = 1000000000; // 1 second
+static constexpr uint64_t DEFAULT_TIMEOUT_MS = DEFAULT_TIMEOUT_NS / 1000000;
+
+// Detect and throw error
+static void vx_default_error_handler(VkResult result, const char* functionName) {
+    std::cout << "Vulkan error in function: " << functionName << " - " << string_VkResult(result) << std::endl;
+    throw std::runtime_error("\tVulkan error: " + std::string(string_VkResult(result)) + " in function " + std::string(functionName) + ", terminating program.");
+}
+
+// Detect and warn about errors to std::cout
+static void vx_default_warn_handler(VkResult result, const char* functionName) {
+    std::cout << "Vulkan warning in function: " << functionName << " - " << string_VkResult(result) << " (continuing execution)" << std::endl;
+}
+
+// Ignore error
+static void vx_ignore_handler(VkResult result, const char* functionName) {
+}
+
+#define VX_CHECK(result, functionName) \
+    do { \
+        VkResult _vx_result = (result); \
+        if(_vx_result != VK_SUCCESS) { \
+            vx_default_error_handler(_vx_result, functionName); \
+        } \
+    } while(0)
+
+#define VX_WARN(result, functionName) \
+    do { \
+        VkResult _vx_result = (result); \
+        if(_vx_result != VK_SUCCESS) { \
+            vx_default_warn_handler(_vx_result, functionName); \
+        } \
+    } while(0)
+
+#define VX_CHECK_IGNORE(result, functionName) \
+    do { \
+        VkResult _vx_result = (result); \
+        if(_vx_result != VK_SUCCESS) { \
+            vx_ignore_handler(_vx_result, functionName); \
+        } \
+    } while(0)  
+
+#define VX_CHECK_HANDLE(result, handler) \
+    do { \
+        VkResult _vx_result = (result); \
+        if(_vx_result != VK_SUCCESS) { \
+            (handler)(_vx_result); \
+        } \
+    } while(0)
 
 constexpr static VkFenceCreateInfo createFenceInfo(VkFenceCreateFlags flags) {
     VkFenceCreateInfo fenceCreateInfo = {};
@@ -23,7 +112,7 @@ constexpr static VkSemaphoreCreateInfo createSemaphoreInfo(VkSemaphoreCreateFlag
     return semaphoreCreateInfo;
 }
 
-VkImageSubresourceRange createImageSubresourceRange(VkImageAspectFlags aspectMask)
+constexpr static VkImageSubresourceRange createImageSubresourceRange(VkImageAspectFlags aspectMask)
 {
     VkImageSubresourceRange subImage {};
     subImage.aspectMask = aspectMask;
@@ -35,7 +124,7 @@ VkImageSubresourceRange createImageSubresourceRange(VkImageAspectFlags aspectMas
     return subImage;
 }
 
-VkSemaphoreSubmitInfo createSemaphoreSubmitInfo(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore){
+constexpr static VkSemaphoreSubmitInfo createSemaphoreSubmitInfo(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore){
     VkSemaphoreSubmitInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
     info.pNext = nullptr;
@@ -47,7 +136,7 @@ VkSemaphoreSubmitInfo createSemaphoreSubmitInfo(VkPipelineStageFlags2 stageMask,
     return info;
 }
 
-VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(VkCommandBuffer commandBuffer){
+constexpr static VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(VkCommandBuffer commandBuffer){
     VkCommandBufferSubmitInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     info.pNext = nullptr;
@@ -58,7 +147,7 @@ VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(VkCommandBuffer commandB
 }
 
 // Takes in a command buffer info, a signal semaphore info, and a wait semaphore info.
-VkSubmitInfo2 createSubmitInfo2(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo, VkSemaphoreSubmitInfo* waitSemaphoreInfo){
+constexpr static VkSubmitInfo2 createSubmitInfo2(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo, VkSemaphoreSubmitInfo* waitSemaphoreInfo){
     VkSubmitInfo2 info = {};
 
     info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -75,10 +164,55 @@ VkSubmitInfo2 createSubmitInfo2(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmi
     return info;
 }
 
+constexpr static VkCommandBufferBeginInfo beginCommandBufferInfo(VkCommandBufferUsageFlags flags) {
+    VkCommandBufferBeginInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.pNext = nullptr;
+
+    info.pInheritanceInfo = nullptr;
+    info.flags = flags;
+    return info;
+}
+
+constexpr static VkImageCreateInfo createImageCreateInfo(VkFormat format, VkImageUsageFlags usageFlages, VkExtent3D extent){
+    VkImageCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.pNext = nullptr;
+
+    info.imageType = VK_IMAGE_TYPE_2D;
+
+    info.format = format;
+    info.extent = extent;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = usageFlages;
+
+    return info;
+}
+
+constexpr static VkImageViewCreateInfo createImageViewCreateInfo(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags){
+    VkImageViewCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    info.pNext = nullptr;
+
+    info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    info.image = image;
+    info.format = format;
+    info.subresourceRange.baseMipLevel = 0;
+    info.subresourceRange.levelCount = 1;
+    info.subresourceRange.baseArrayLayer = 0;
+    info.subresourceRange.layerCount = 1;
+    info.subresourceRange.aspectMask = aspectFlags;
+
+    return info;
+}
+
 // Transition image layout from one layout to another.
 // This is a temporary, simple, stupid implementation with performance implications.
 // TODO: Implement a more efficient way to transition image layouts.
-void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout){
+static void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout){
     VkImageMemoryBarrier2 imageBarrier {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
     imageBarrier.pNext = nullptr;
 
@@ -113,5 +247,4 @@ void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout cur
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-
-}; // namespace VxUtils 
+} // namespace VxEngine 

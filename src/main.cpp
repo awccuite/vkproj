@@ -1,7 +1,7 @@
 #include <vulkan/vulkan.h>
 #include <iostream>
 
-#include "renderer/vk_renderer.hpp"
+#include "renderer/vx_renderer.hpp"
 
 int main(int argc, char* argv[]) {
     try {

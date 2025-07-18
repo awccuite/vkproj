@@ -1,6 +1,4 @@
-#include "vk_renderer.hpp"
-#include "vk_constants.hpp"
-#include "vx_utils.hpp"
+#include "vx_renderer.hpp"
 
 #include <chrono>
 #include <thread>
@@ -10,6 +8,9 @@
 
 #include "3rdparty/vk-bootstrap/src/VkBootstrap.h"
 #include "vulkan/vulkan_core.h"
+
+#define VMA_IMPLEMENTATION
+#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 
 namespace VxEngine {
 
@@ -28,13 +29,17 @@ void VulkanRenderer::init() {
 
     init_window();
     init_vulkan();
+    std::cout << "Vulkan initialized" << std::endl;
     init_swapchain();
+    std::cout << "Swapchain initialized" << std::endl;
     init_commands();
+    std::cout << "Commands initialized" << std::endl;
     init_sync_structures();
-    
+    std::cout << "Sync structures initialized" << std::endl;
     print_vulkan_info();
-    
+
     _isInitialized = true;
+    std::cout << "Renderer initialized" << std::endl;
 }
 
 // Function to print Vulkan version information
@@ -84,7 +89,7 @@ void VulkanRenderer::init_window() {
 void VulkanRenderer::init_vulkan() {
     // Query instance version before creating instance
     uint32_t instanceVersion = 0;
-    VX_WARN(vkEnumerateInstanceVersion(&instanceVersion));
+    VX_WARN(vkEnumerateInstanceVersion(&instanceVersion), "vkEnumerateInstanceVersion");
     std::cout << "System Vulkan Instance Version: " 
               << VK_VERSION_MAJOR(instanceVersion) << "."
               << VK_VERSION_MINOR(instanceVersion) << "."
@@ -132,9 +137,23 @@ void VulkanRenderer::init_vulkan() {
     
     // Get the physical device properties after selecting the device
     vkGetPhysicalDeviceProperties(_physicalDevice, &_deviceProperties);
+
+    // Initialize VMA
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = _physicalDevice;
+    allocatorInfo.device = _device;
+    allocatorInfo.instance = _instance;
+    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+    VX_CHECK(vmaCreateAllocator(&allocatorInfo, &_allocator), "vmaCreateAllocator");
+
+    _deletionManager.push_function([this]() {
+        vmaDestroyAllocator(_allocator);
+    });
 }
 
-void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
+void VulkanRenderer::create_swapchain(/*uint32_t width, uint32_t height*/) {
     vkb::SwapchainBuilder swapchainBuilder(_physicalDevice, _device, _surface);
 
     _swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
@@ -143,12 +162,13 @@ void VulkanRenderer::create_swapchain(uint32_t width, uint32_t height) {
         .use_default_format_selection()
         .set_desired_format(VkSurfaceFormatKHR{ .format = _swapchainImageFormat, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-        .set_desired_extent(width, height)
+        .set_desired_extent(_windowExtent.width, _windowExtent.height)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build()
         .value();
 
         _swapchainExtent = vkbSwapchain.extent;
+        _drawExtent = _swapchainExtent;
         _swapchain = vkbSwapchain.swapchain;
         _swapchainImages = vkbSwapchain.get_images().value();
         _swapchainImageViews = vkbSwapchain.get_image_views().value();
@@ -166,8 +186,41 @@ void VulkanRenderer::destroy_swapchain() {
     _swapchain = nullptr;
 }
 
+void VulkanRenderer::create_draw_image() {
+    VkExtent3D extent = {_drawExtent.width, _drawExtent.height, 1}; // 3D extent with 1 depth.
+
+    _drawImage.format = VK_FORMAT_R16G16B16A16_SFLOAT; // High precision float format.
+    _drawImage.extent = extent; // Assign our extent to the image. The drawImage has a 3d extent, while the swapchain has a 2d extent.
+
+    VkImageUsageFlags drawImageUsageFlags{};
+    drawImageUsageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    drawImageUsageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    drawImageUsageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
+    drawImageUsageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo image_info = createImageCreateInfo(_drawImage.format, drawImageUsageFlags, extent);
+
+    VmaAllocationCreateInfo allocInfo = {};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    allocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    // allocate and create the image.
+    VX_CHECK(vmaCreateImage(_allocator, &image_info, &allocInfo, &_drawImage.image, &_drawImage.allocation, nullptr), "vmaCreateImage");
+
+    VkImageViewCreateInfo view_info = createImageViewCreateInfo(_drawImage.format, _drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+    VX_CHECK(vkCreateImageView(_device, &view_info, nullptr, &_drawImage.imageView), "vkCreateImageView");
+
+    _deletionManager.push_function([this]() {
+        vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
+        vkDestroyImageView(_device, _drawImage.imageView, nullptr);
+    });
+}
+
 void VulkanRenderer::init_swapchain() {
-    create_swapchain(_windowExtent.width, _windowExtent.height);
+    create_swapchain();
+    std::cout << "Swapchain created" << std::endl;
+    create_draw_image();
+    std::cout << "Draw image created" << std::endl;
 }
 
 // TODO: Understand this better.
@@ -185,7 +238,7 @@ void VulkanRenderer::init_commands() {
 
     for(int i = 0; i < LIVE_FRAMES; i++) {
         // Each frame has its own command pool, but they are configured identically.
-        VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
+        VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool), "vkCreateCommandPool");
 
         // Create a command buffer for each frame.
         VkCommandBufferAllocateInfo commandBufferAllocInfo = {}; // Initialize to zero.
@@ -199,7 +252,7 @@ void VulkanRenderer::init_commands() {
         // _frames[i]._commandBuffer array. This is where frameData is stored.
         // This is where we will record our commands.
 
-        VX_CHECK(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer));
+        VX_CHECK(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer), "vkAllocateCommandBuffers");
     }
 
     std::cout << "Initialized command structures" << std::endl;
@@ -211,13 +264,13 @@ void VulkanRenderer::init_commands() {
 void VulkanRenderer::init_sync_structures() {
     // Use constexpr to create compile time constants
     // that are used to initialize the default fence and semaphore structures.
-    constexpr VkFenceCreateInfo fenceInfo = VxUtils::createFenceInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-    constexpr VkSemaphoreCreateInfo semaphoreInfo = VxUtils::createSemaphoreInfo(0);
+    constexpr VkFenceCreateInfo fenceInfo = createFenceInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+    constexpr VkSemaphoreCreateInfo semaphoreInfo = createSemaphoreInfo(0);
 
     for(int i = 0; i < LIVE_FRAMES; i++) {
-        VX_CHECK(vkCreateFence(_device, &fenceInfo, nullptr, &_frames[i]._inFlightFence));
-        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._swapchainSem));
-        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._renderSem));
+        VX_CHECK(vkCreateFence(_device, &fenceInfo, nullptr, &_frames[i]._inFlightFence), "vkCreateFence");
+        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._swapchainSem), "vkCreateSemaphore");
+        VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._renderSem), "vkCreateSemaphore");
     }
 }
 
@@ -264,16 +317,6 @@ void VulkanRenderer::cleanup() {
     renderer = nullptr;
 }
 
-constexpr static VkCommandBufferBeginInfo beginCommandBufferInfo(VkCommandBufferUsageFlags flags) {
-    VkCommandBufferBeginInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    info.pNext = nullptr;
-
-    info.pInheritanceInfo = nullptr;
-    info.flags = flags;
-    return info;
-}
-
 void VulkanRenderer::draw() {
     // std::cout << "Drawing frame " << _frameNumber << std::endl;
     if(_windowMinizmized) { // Limit FPS when window is minimized.
@@ -282,46 +325,46 @@ void VulkanRenderer::draw() {
 
     // Check the "current frame" (at start of loop, this would be the frame from the previous draw call)
     // Wait for the fence, then reset it.
-    VX_CHECK(vkWaitForFences(_device, 1, &get_current_frame_data()._inFlightFence, VK_TRUE, DEFAULT_TIMEOUT_NS));
+    VX_CHECK(vkWaitForFences(_device, 1, &get_current_frame_data()._inFlightFence, VK_TRUE, DEFAULT_TIMEOUT_NS), "vkWaitForFences");
     // After the frame is done, we can reset the fence and delete the frames objects.
     get_current_frame_data().cleanup();
 
     // Reset the fence for the current frame.
-    VX_CHECK(vkResetFences(_device, 1, &get_current_frame_data()._inFlightFence));
+    VX_CHECK(vkResetFences(_device, 1, &get_current_frame_data()._inFlightFence), "vkResetFences");
 
     uint32_t swapchainImageIndex;
-    VX_CHECK(vkAcquireNextImageKHR(_device, _swapchain, DEFAULT_TIMEOUT_NS, get_current_frame_data()._swapchainSem, nullptr, &swapchainImageIndex));
+    VX_CHECK(vkAcquireNextImageKHR(_device, _swapchain, DEFAULT_TIMEOUT_NS, get_current_frame_data()._swapchainSem, nullptr, &swapchainImageIndex), "vkAcquireNextImageKHR");
 
     VkCommandBuffer commandBuffer = get_current_frame_data()._commandBuffer;
-    VX_CHECK(vkResetCommandBuffer(commandBuffer, 0)); // Grab and reset the command buffer for the framedata at index.
+    VX_CHECK(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer"); // Grab and reset the command buffer for the framedata at index.
 
     // Begin command buffer
     constexpr auto commandBufferBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
+    VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo), "vkBeginCommandBuffer");
 
     // Transition the image layout to a general (unoptimized) layout.
-    VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
     float b = static_cast<float>(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / DEFAULT_TIMEOUT_NS) + 1.0f) / 2.0f;
     VkClearColorValue clearValue = {{0.0f, 0.0f, b , 1.0f}};
 
-    VkImageSubresourceRange clearRange = VxUtils::createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageSubresourceRange clearRange = createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     // Clear the image with our clearValue (should sinusoudally change colors per frame)
     vkCmdClearColorImage(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 
     // Make the image presentable (Draw with VK_IMAGE_LAYOUT_PRESENT_SRC_KHR), from general layout.
-    VxUtils::transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    VX_CHECK(vkEndCommandBuffer(commandBuffer));
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    VX_CHECK(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     // End the command buffer.
 
-    VkCommandBufferSubmitInfo commandBufferSubmitInfo = VxUtils::createCommandBufferSubmitInfo(commandBuffer);
+    VkCommandBufferSubmitInfo commandBufferSubmitInfo = createCommandBufferSubmitInfo(commandBuffer);
     // Grab the previous frame's swapchain semaphore to wait on.
-    VkSemaphoreSubmitInfo waitSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._swapchainSem);
-    VkSemaphoreSubmitInfo signalSemaphoreInfo = VxUtils::createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._renderSem);
-    
-    VkSubmitInfo2 submitInfo = VxUtils::createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
-    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, get_current_frame_data()._inFlightFence));
+    VkSemaphoreSubmitInfo waitSemaphoreInfo = createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._swapchainSem);
+VkSemaphoreSubmitInfo signalSemaphoreInfo = createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._renderSem);
+
+VkSubmitInfo2 submitInfo = createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
+    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, get_current_frame_data()._inFlightFence), "vkQueueSubmit2");
 
     // Present the image to the screen.
     VkPresentInfoKHR presentInfo = {};
@@ -335,7 +378,7 @@ void VulkanRenderer::draw() {
 
     presentInfo.pImageIndices = &swapchainImageIndex;
 
-    VX_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
+    VX_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo), "vkQueuePresentKHR");
 
     _frameNumber++;
 }

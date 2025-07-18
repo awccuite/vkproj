@@ -1,9 +1,9 @@
 add_library(renderer STATIC
-    vk_renderer.hpp
-    vk_renderer.cpp
     vx_utils.hpp
-    vk_deletionManager.hpp
-    vk_deletionManager.cpp
+    vx_renderer.hpp
+    vx_renderer.cpp
+    vx_deletionManager.hpp
+    vx_deletionManager.cpp
 )
 
 add_subdirectory(3rdparty/vk-bootstrap)
@@ -22,4 +22,4 @@ target_link_libraries(renderer PUBLIC
     ${SDL3_LIBRARIES}
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
-) 
+)
