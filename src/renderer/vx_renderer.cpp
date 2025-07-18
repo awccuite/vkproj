@@ -342,28 +342,30 @@ void VulkanRenderer::draw() {
     constexpr auto commandBufferBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo), "vkBeginCommandBuffer");
 
-    // Transition the image layout to a general (unoptimized) layout.
-    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    // Transition the draw image to a general (unoptimized) layout.
+    transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    float b = static_cast<float>(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / DEFAULT_TIMEOUT_NS) + 1.0f) / 2.0f;
-    VkClearColorValue clearValue = {{0.0f, 0.0f, b , 1.0f}};
+    draw_background(commandBuffer); // Clear the draw image.
 
-    VkImageSubresourceRange clearRange = createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    // Clear the image with our clearValue (should sinusoudally change colors per frame)
-    vkCmdClearColorImage(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+    // After drawing, we need to transition the draw image to transfer source layout.
+    // We also need to transition the swapchain image to a transfer destination layout.
+    // Then we can copy the draw image to the swapchain image.
+    // Finally, we need to transition the swapchain image to a presentable layout.
+    transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyImageToImage(commandBuffer, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent); // copy from draw image to swapchain.
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR); // transfer to presentable layout
 
-    // Make the image presentable (Draw with VK_IMAGE_LAYOUT_PRESENT_SRC_KHR), from general layout.
-    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     VX_CHECK(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     // End the command buffer.
 
     VkCommandBufferSubmitInfo commandBufferSubmitInfo = createCommandBufferSubmitInfo(commandBuffer);
     // Grab the previous frame's swapchain semaphore to wait on.
     VkSemaphoreSubmitInfo waitSemaphoreInfo = createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._swapchainSem);
-VkSemaphoreSubmitInfo signalSemaphoreInfo = createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._renderSem);
+    VkSemaphoreSubmitInfo signalSemaphoreInfo = createSemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, get_current_frame_data()._renderSem);
 
-VkSubmitInfo2 submitInfo = createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
+    // Submit the command buffer to the graphics queue.
+    VkSubmitInfo2 submitInfo = createSubmitInfo2(&commandBufferSubmitInfo, &signalSemaphoreInfo, &waitSemaphoreInfo);
     VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submitInfo, get_current_frame_data()._inFlightFence), "vkQueueSubmit2");
 
     // Present the image to the screen.
@@ -376,11 +378,21 @@ VkSubmitInfo2 submitInfo = createSubmitInfo2(&commandBufferSubmitInfo, &signalSe
     presentInfo.pWaitSemaphores = &get_current_frame_data()._renderSem;
     presentInfo.waitSemaphoreCount = 1;
 
+    // Present the image to the screen.
     presentInfo.pImageIndices = &swapchainImageIndex;
-
     VX_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo), "vkQueuePresentKHR");
 
     _frameNumber++;
+}
+
+void VulkanRenderer::draw_background(VkCommandBuffer commandBuffer) { // Clear the draw image.
+    constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    float b = static_cast<float>(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / DEFAULT_TIMEOUT_NS) + 1.0f) / 2.0f;
+    VkClearColorValue clearValue = {{0.0f, 0.0f, b , 1.0f}};
+
+    VkImageSubresourceRange clearRange = createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    // Clear the image with our clearValue (should sinusoudally change colors per frame)
+    vkCmdClearColorImage(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 }
 
 void VulkanRenderer::run() {

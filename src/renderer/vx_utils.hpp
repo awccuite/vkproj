@@ -22,17 +22,9 @@
 // #include <glm/vec4.hpp>
 
 #include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
+#include "vx_image.hpp"
 
 namespace VxEngine {
-
-// Types
-struct AllocatedImage{
-    VkImage image;
-    VkImageView imageView;
-    VmaAllocation allocation;
-    VkExtent3D extent;
-    VkFormat format;
-};
 
 static constexpr uint32_t VK_VERSION_MAJOR_MIN = 1;
 static constexpr uint32_t VK_VERSION_MINOR_MIN = 3;
@@ -59,8 +51,7 @@ static void vx_default_warn_handler(VkResult result, const char* functionName) {
 }
 
 // Ignore error
-static void vx_ignore_handler(VkResult result, const char* functionName) {
-}
+static void vx_ignore_handler(VkResult result, const char* functionName) {}
 
 #define VX_CHECK(result, functionName) \
     do { \
@@ -207,44 +198,6 @@ constexpr static VkImageViewCreateInfo createImageViewCreateInfo(VkFormat format
     info.subresourceRange.aspectMask = aspectFlags;
 
     return info;
-}
-
-// Transition image layout from one layout to another.
-// This is a temporary, simple, stupid implementation with performance implications.
-// TODO: Implement a more efficient way to transition image layouts.
-static void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout){
-    VkImageMemoryBarrier2 imageBarrier {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-    imageBarrier.pNext = nullptr;
-
-    imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    imageBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
-
-    imageBarrier.oldLayout = currentLayout;
-    imageBarrier.newLayout = newLayout;
-
-    VkImageAspectFlags aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-
-    // VkImageSubresourceRange subImage{};
-    // subImage.aspectMask = aspectMask;
-    // subImage.baseMipLevel = 0;
-    // subImage.levelCount = VK_REMAINING_MIP_LEVELS;
-    // subImage.baseArrayLayer = 0;
-    // subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    VkImageSubresourceRange subImage = createImageSubresourceRange(aspectMask);
-
-    imageBarrier.subresourceRange = subImage;
-    imageBarrier.image = image;
-
-    VkDependencyInfo depInfo {};
-    depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    depInfo.pNext = nullptr;
-
-    depInfo.imageMemoryBarrierCount = 1;
-    depInfo.pImageMemoryBarriers = &imageBarrier;
-
-    vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
 } // namespace VxEngine 

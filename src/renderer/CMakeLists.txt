@@ -1,5 +1,7 @@
 add_library(renderer STATIC
     vx_utils.hpp
+    vx_image.hpp
+    vx_image.cpp
     vx_renderer.hpp
     vx_renderer.cpp
     vx_deletionManager.hpp

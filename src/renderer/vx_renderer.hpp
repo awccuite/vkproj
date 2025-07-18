@@ -2,6 +2,7 @@
 
 #include "vx_deletionManager.hpp"
 #include "vx_utils.hpp"
+#include "vx_image.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -76,6 +77,7 @@ public:
     void cleanup_vk_objects();
 
 	void draw();
+	void draw_background(VkCommandBuffer commandBuffer);
 	void run();
 	void print_vulkan_info(); // Function to print Vulkan version info
 
