@@ -4,6 +4,7 @@
 
 namespace VxEngine {
 
+// A struct to hold an allocated image. Used for the engine draw image.
 struct AllocatedImage{
     VkImage image;
     VkImageView imageView;
