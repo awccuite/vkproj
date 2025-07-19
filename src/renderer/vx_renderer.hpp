@@ -3,6 +3,7 @@
 #include "vx_deletionManager.hpp"
 #include "vx_utils.hpp"
 #include "vx_image.hpp"
+#include "vx_descriptors.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -66,7 +67,7 @@ public:
 	std::vector<VkImageView> _swapchainImageViews;
 
 	VmaAllocator _allocator;
-	DeletionManager _deletionManager; // Used to cleanup vulkan objects created for the renderer.
+	DeletionManager _engineDeletionManager; // Used to cleanup vulkan objects created for the renderer.
 
 	// Draw image variables
 	AllocatedImage _drawImage;
@@ -87,6 +88,7 @@ private:
 	void init_swapchain();
 	void init_commands();
 	void init_sync_structures();
+	void init_descriptors();
 
 	void create_swapchain(/*uint32_t width, uint32_t height*/);
 	void create_draw_image();
@@ -95,6 +97,7 @@ private:
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debugMessenger;
+	DescriptorManager _descriptorManager;
 };
 
 } // namespace VxEngine

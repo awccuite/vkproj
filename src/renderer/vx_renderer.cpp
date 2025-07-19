@@ -36,6 +36,8 @@ void VulkanRenderer::init() {
     std::cout << "Commands initialized" << std::endl;
     init_sync_structures();
     std::cout << "Sync structures initialized" << std::endl;
+    init_descriptors();
+    std::cout << "Descriptors initialized" << std::endl;
     print_vulkan_info();
 
     _isInitialized = true;
@@ -148,7 +150,7 @@ void VulkanRenderer::init_vulkan() {
 
     VX_CHECK(vmaCreateAllocator(&allocatorInfo, &_allocator), "vmaCreateAllocator");
 
-    _deletionManager.push_function([this]() {
+    _engineDeletionManager.push_function([this]() {
         vmaDestroyAllocator(_allocator);
     });
 }
@@ -210,7 +212,7 @@ void VulkanRenderer::create_draw_image() {
     VkImageViewCreateInfo view_info = createImageViewCreateInfo(_drawImage.format, _drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
     VX_CHECK(vkCreateImageView(_device, &view_info, nullptr, &_drawImage.imageView), "vkCreateImageView");
 
-    _deletionManager.push_function([this]() {
+    _engineDeletionManager.push_function([this]() {
         vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
         vkDestroyImageView(_device, _drawImage.imageView, nullptr);
     });
@@ -274,6 +276,45 @@ void VulkanRenderer::init_sync_structures() {
     }
 }
 
+void VulkanRenderer::init_descriptors() {
+    std::vector<DescriptorManager::PoolSizeRatio> sizes = {
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1.0f }
+    };
+    // Allocate 10 descriptor sets for the draw image.
+    _descriptorManager.init_pool(_device, 10, sizes);
+
+    // Create a layout for the draw image descriptor set.
+    auto layoutBuilder = _descriptorManager.createLayoutBuilder();
+    layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    _descriptorManager.drawImageDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_ALL, nullptr, 0);
+
+    _descriptorManager.drawImageDescritptors = _descriptorManager.allocate(_device, _descriptorManager.drawImageDescriptorLayout);
+
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = _drawImage.imageView;
+
+    VkWriteDescriptorSet drawImageWriteDescriptorSet = {};
+    drawImageWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    drawImageWriteDescriptorSet.pNext = nullptr;
+
+    drawImageWriteDescriptorSet.dstBinding = 0;
+    drawImageWriteDescriptorSet.dstSet = _descriptorManager.drawImageDescritptors;
+    // drawImageWriteDescriptorSet.dstArrayElement = 0;
+    drawImageWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    drawImageWriteDescriptorSet.descriptorCount = 1;
+    drawImageWriteDescriptorSet.pImageInfo = &imageInfo;
+    
+    vkUpdateDescriptorSets(_device, 1, &drawImageWriteDescriptorSet, 0, nullptr);
+
+    _engineDeletionManager.push_function([this]() {
+        _descriptorManager.clear_descriptors(_device);
+        _descriptorManager.destroy_pool(_device);
+        vkDestroyDescriptorSetLayout(_device, _descriptorManager.drawImageDescriptorLayout, nullptr);
+    });
+}
+
+
 void VulkanRenderer::destroy_frame_data() {
     for(int i = 0; i < LIVE_FRAMES; i++) {
         vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
@@ -286,7 +327,7 @@ void VulkanRenderer::destroy_frame_data() {
 }
 
 void VulkanRenderer::cleanup_vk_objects() {
-    _deletionManager.delete_objects();
+    _engineDeletionManager.delete_objects();
 }
 
 void VulkanRenderer::cleanup() {
