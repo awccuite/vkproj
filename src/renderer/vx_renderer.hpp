@@ -78,9 +78,8 @@ public:
 	VkPipelineLayout _gradientPipelineLayout;
 	
 	void init();
-	void cleanup();
-    
 	void run();
+	void cleanup();
 	
 private:
 	void init_window();
@@ -91,13 +90,14 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
+	void init_imgui();
 
 	void cleanup_vk_objects();
 
 	void draw();
 	void draw_background(VkCommandBuffer commandBuffer);
 
-	void print_vulkan_info(); // Function to print Vulkan version info
+	void print_vulkan_info();
 
 	void create_swapchain();
 	void create_draw_image();
