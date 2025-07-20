@@ -7,3 +7,4 @@
 [submodule "src/renderer/3rdparty/imgui"]
 	path = src/renderer/3rdparty/imgui
 	url = git@github.com:awccuite/vk-imgui.git
+	branch = vk-renderer
