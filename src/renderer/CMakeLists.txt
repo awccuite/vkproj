@@ -22,8 +22,13 @@ if(BUILD_SUBMODULES)
 else()
     message(STATUS "Skipping submodules - using existing libraries")
     # Find the already-built libraries
-    find_library(VK_BOOTSTRAP_LIB vk-bootstrap PATHS ${CMAKE_BINARY_DIR} REQUIRED)
-    find_library(VMA_LIB VulkanMemoryAllocator PATHS ${CMAKE_BINARY_DIR} REQUIRED)
+    set(VK_BOOTSTRAP_LIB "${CMAKE_BINARY_DIR}/src/renderer/3rdparty/vk-bootstrap/libvk-bootstrap.a")
+
+    if(NOT EXISTS "${VK_BOOTSTRAP_LIB}")
+        message(FATAL_ERROR "vk-bootstrap library not found at expected path: ${VK_BOOTSTRAP_LIB}.\nRun a clean build (./build.sh -c) once to build third-party submodules, then incremental builds can skip them.")
+    endif()
+
+    # VulkanMemoryAllocator is header-only, so no library to find
     
     # Create imported targets for the existing libraries
     add_library(vk-bootstrap::vk-bootstrap STATIC IMPORTED)

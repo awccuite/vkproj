@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "3rdparty/vk-bootstrap/src/VkBootstrap.h"
+#include "SDL3/SDL_events.h"
 #include "vulkan/vulkan_core.h"
 
 #define VMA_IMPLEMENTATION
@@ -502,7 +503,7 @@ void VulkanRenderer::run() {
                 quit = true;
                 break;
             }
-
+            
             if(e.type == SDL_EVENT_WINDOW_MINIMIZED){
                 std::cout << "Window minimized" << std::endl;
                 _windowMinizmized = true;
@@ -513,7 +514,6 @@ void VulkanRenderer::run() {
             }
         }
         
-        // Simple delay
         draw();
     }
     

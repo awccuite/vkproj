@@ -15,7 +15,7 @@ class VulkanRenderer {
 public:
 	static VulkanRenderer& Get(); // Singleton renderer get
 
-	// Owned on a per frame basis, which lives in _frames
+	// Per frame data. Frames have their own command pool, command buffer, and synchronization structures.
 	// Maintains command data as well as synchronization structures.
     struct FrameData {
 		// Command data
@@ -23,7 +23,6 @@ public:
 		VkCommandBuffer _commandBuffer;
 
 		// Synchronization structures
-
 		// Semaphores are used for gpu -> gpu synchronzation
 		// Fences are used for cpu -> gpu synchronization
 
