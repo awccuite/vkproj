@@ -8,6 +8,8 @@ add_library(renderer STATIC
     vx_deletionManager.cpp
     vx_descriptors.hpp
     vx_descriptors.cpp
+    vx_pipeline.hpp
+    vx_pipeline.cpp
 )
 
 # Option to control submodule building (default ON for clean builds)
@@ -50,3 +52,6 @@ target_link_libraries(renderer PUBLIC
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
 )
+
+# Include shader compilation
+add_subdirectory(shaders)

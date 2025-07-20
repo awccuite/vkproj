@@ -4,6 +4,7 @@
 #include "vx_utils.hpp"
 #include "vx_image.hpp"
 #include "vx_descriptors.hpp"
+#include "vx_pipeline.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -72,16 +73,16 @@ public:
 	// Draw image variables
 	AllocatedImage _drawImage;
 	VkExtent2D _drawExtent;
+
+	// Pipelines for now
+	VkPipeline _gradientPipeline;
+	VkPipelineLayout _gradientPipelineLayout;
 	
 	void init();
 	void cleanup();
-    void cleanup_vk_objects();
-
-	void draw();
-	void draw_background(VkCommandBuffer commandBuffer);
+    
 	void run();
-	void print_vulkan_info(); // Function to print Vulkan version info
-
+	
 private:
 	void init_window();
 	void init_vulkan();
@@ -89,8 +90,17 @@ private:
 	void init_commands();
 	void init_sync_structures();
 	void init_descriptors();
+	void init_pipelines();
+	void init_background_pipelines();
 
-	void create_swapchain(/*uint32_t width, uint32_t height*/);
+	void cleanup_vk_objects();
+
+	void draw();
+	void draw_background(VkCommandBuffer commandBuffer);
+
+	void print_vulkan_info(); // Function to print Vulkan version info
+
+	void create_swapchain();
 	void create_draw_image();
 	void destroy_swapchain();
 	void destroy_frame_data();

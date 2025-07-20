@@ -60,4 +60,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Vulkan
     ${SDL3_LIBRARIES}
     renderer
-) 
+)
+
+# Ensure SPIR-V binaries are built before we launch the executable.
+add_dependencies(${PROJECT_NAME} compile_shaders) 
