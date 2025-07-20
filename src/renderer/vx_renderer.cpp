@@ -430,7 +430,7 @@ void VulkanRenderer::draw() {
     // Transition the draw image to a general (unoptimized) layout.
     transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    draw_background(commandBuffer); // Clear the draw image.
+    draw_background(commandBuffer); // Draw the background image to the drawImage. This is where the background shader is executed.
 
     // After drawing, we need to transition the draw image to transfer source layout.
     // We also need to transition the swapchain image to a transfer destination layout.
@@ -470,6 +470,7 @@ void VulkanRenderer::draw() {
     _frameNumber++;
 }
 
+// Draw the background image.
 void VulkanRenderer::draw_background(VkCommandBuffer commandBuffer) { // Clear the draw image.
     constexpr VkClearColorValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
     float b = static_cast<float>(std::sin(static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) / DEFAULT_TIMEOUT_NS) + 1.0f) / 2.0f;
