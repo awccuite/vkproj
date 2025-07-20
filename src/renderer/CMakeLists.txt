@@ -19,7 +19,7 @@ if(BUILD_SUBMODULES)
     message(STATUS "Building submodules...")
     add_subdirectory(3rdparty/vk-bootstrap)
     add_subdirectory(3rdparty/VulkanMemoryAllocator)
-    add_subdirectory(3rdparty/imgui)
+    # add_subdirectory(3rdparty/imgui) // Not built with cmakelists.txt
 else()
     message(STATUS "Skipping submodules - using existing libraries")
     # Find the already-built libraries
