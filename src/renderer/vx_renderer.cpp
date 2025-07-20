@@ -270,7 +270,7 @@ void VulkanRenderer::init_commands() {
 
     _engineDeletionManager.push_function([this]() {
         vkDestroyCommandPool(_device, _immCommandPool, nullptr);
-        vkFreeCommandBuffers(_device, _immCommandPool, 1, &_immCommandBuffer);
+        // vkFreeCommandBuffers(_device, _immCommandPool, 1, &_immCommandBuffer);
     });
 
     std::cout << "Initialized command structures" << std::endl;
