@@ -50,6 +50,8 @@ string(REPLACE "C:" "/c" SDL3_INCLUDE_DIRS_UNIX "${SDL3_INCLUDE_DIRS}")
 target_include_directories(renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${SDL3_INCLUDE_DIRS_UNIX}
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui/backends"
 )
 
 target_link_libraries(renderer PUBLIC
@@ -57,6 +59,7 @@ target_link_libraries(renderer PUBLIC
     ${SDL3_LIBRARIES}
     vk-bootstrap::vk-bootstrap
     GPUOpen::VulkanMemoryAllocator
+    imgui
 )
 
 # Include shader compilation
