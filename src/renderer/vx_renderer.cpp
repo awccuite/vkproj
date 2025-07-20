@@ -243,27 +243,30 @@ void VulkanRenderer::init_commands() {
 
     for(int i = 0; i < LIVE_FRAMES; i++) {
         // Each frame has its own command pool, but they are configured identically.
-        VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool), "vkCreateCommandPool");
+        VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool), "failed to create frame command pool");
 
         // Create a command buffer for each frame.
-        VkCommandBufferAllocateInfo commandBufferAllocInfo = {}; // Initialize to zero.
-        commandBufferAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        commandBufferAllocInfo.pNext = nullptr;
-        commandBufferAllocInfo.commandPool = _frames[i]._commandPool;
-        commandBufferAllocInfo.commandBufferCount = 1;
-        commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        VkCommandBufferAllocateInfo commandBufferAllocInfo = createCommandBufferAllocateInfo(_frames[i]._commandPool, 1, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
         // Allocate a command buffer for each frame in our
         // _frames[i]._commandBuffer array. This is where frameData is stored.
         // This is where we will record our commands.
 
-        VX_CHECK(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer), "vkAllocateCommandBuffers");
+        VX_CHECK(vkAllocateCommandBuffers(_device, &commandBufferAllocInfo, &_frames[i]._commandBuffer), "failed to allocate frame command buffer");
     }
+
+    VX_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_immCommandPool), "failed to create imgui command pool");
+
+    VkCommandBufferAllocateInfo immCommandBufferAllocInfo = createCommandBufferAllocateInfo(_immCommandPool, 1, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    VX_CHECK(vkAllocateCommandBuffers(_device, &immCommandBufferAllocInfo, &_immCommandBuffer), "failed to allocate imgui command buffer");
+
+    _engineDeletionManager.push_function([this]() {
+        vkDestroyCommandPool(_device, _immCommandPool, nullptr);
+        vkFreeCommandBuffers(_device, _immCommandPool, 1, &_immCommandBuffer);
+    });
 
     std::cout << "Initialized command structures" << std::endl;
 }
-
-
 
 // Init per frame synchronization structures.
 void VulkanRenderer::init_sync_structures() {
@@ -277,6 +280,12 @@ void VulkanRenderer::init_sync_structures() {
         VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._swapchainSem), "vkCreateSemaphore");
         VX_CHECK(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_frames[i]._renderSem), "vkCreateSemaphore");
     }
+
+    // Imgui fence.
+    VX_CHECK(vkCreateFence(_device, &fenceInfo, nullptr, &_immFence), "failed to create imgui fence");
+    _engineDeletionManager.push_function([this]() {
+        vkDestroyFence(_device, _immFence, nullptr);
+    });
 }
 
 void VulkanRenderer::init_descriptors() {
@@ -359,6 +368,29 @@ void VulkanRenderer::init_background_pipelines() {
     });
 }
 
+void VulkanRenderer::init_imgui() {
+    
+}
+
+// Immediately submit command buffer without synchornization to the swapchain.
+void VulkanRenderer::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) {
+    VX_CHECK(vkResetFences(_device, 1, &_immFence), "failed to reset imgui fence");
+    VX_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0), "failed to reset imgui command buffer");
+
+    VkCommandBuffer imguiBuffer = _immCommandBuffer;
+    VkCommandBufferBeginInfo imguiBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VX_CHECK(vkBeginCommandBuffer(imguiBuffer, &imguiBeginInfo), "failed to begin imgui command buffer");
+
+    function(imguiBuffer);
+
+    VX_CHECK(vkEndCommandBuffer(imguiBuffer), "failed to end imgui command buffer");
+
+    VkCommandBufferSubmitInfo imguiSubmitInfo = createCommandBufferSubmitInfo(imguiBuffer);
+    VkSubmitInfo2 imguiSubmitInfo2 = createSubmitInfo2(&imguiSubmitInfo, nullptr, nullptr);
+
+    VX_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &imguiSubmitInfo2, _immFence), "failed to submit imgui command buffer");
+    VX_CHECK(vkWaitForFences(_device, 1, &_immFence, VK_TRUE, DEFAULT_TIMEOUT_NS), "failed to wait for imgui fence");
+}
 
 void VulkanRenderer::destroy_frame_data() {
     for(int i = 0; i < LIVE_FRAMES; i++) {

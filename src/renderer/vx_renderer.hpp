@@ -76,7 +76,14 @@ public:
 	// Pipelines for now
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
+
+	// ImGui Variables
+	VkFence _immFence;
+    VkCommandBuffer _immCommandBuffer;
+    VkCommandPool _immCommandPool;
 	
+	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+
 	void init();
 	void run();
 	void cleanup();

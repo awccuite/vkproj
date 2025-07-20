@@ -138,6 +138,17 @@ constexpr static VkCommandBufferSubmitInfo createCommandBufferSubmitInfo(VkComma
     return info;
 }
 
+constexpr static VkCommandBufferAllocateInfo createCommandBufferAllocateInfo(VkCommandPool commandPool, uint32_t commandBufferCount, VkCommandBufferLevel level){
+    VkCommandBufferAllocateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    info.pNext = nullptr;
+    info.commandPool = commandPool;
+    info.commandBufferCount = commandBufferCount;
+    info.level = level;
+
+    return info;
+}
+
 // Takes in a command buffer info, a signal semaphore info, and a wait semaphore info.
 constexpr static VkSubmitInfo2 createSubmitInfo2(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo, VkSemaphoreSubmitInfo* waitSemaphoreInfo){
     VkSubmitInfo2 info = {};
