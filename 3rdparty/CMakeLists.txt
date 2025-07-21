@@ -14,7 +14,6 @@ set_target_properties(GPUOpen::VulkanMemoryAllocator PROPERTIES
 
 # Create interface library for easier linking
 add_library(3rdparty INTERFACE)
-
 target_link_libraries(3rdparty INTERFACE
     imgui
     vk-bootstrap::vk-bootstrap

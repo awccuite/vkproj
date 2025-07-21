@@ -1,21 +1,23 @@
 #include "vx_renderer.hpp"
-#include "vx_utils.hpp"
-#include "vx_deletionManager.hpp"
-#include "vx_descriptors.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_vulkan.h>
-#include <VkBootstrap.h>
+#include <SDL3/SDL.h>
 
 #include <iostream>
-#include <optional>
 #include <vector>
-#include <vk_mem_alloc.h>
+#include <thread>
+#include <cmath>
+#include <optional>
+#include <chrono>
 
-//imgui
-#include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_vulkan.h>
+// 3rd party includes that for some reason dont work with the cmake build system.
+#define VMA_IMPLEMENTATION
+#include "../../3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
+#include "../../3rdparty/vk-bootstrap/src/VkBootstrap.h"
+#include "../../3rdparty/imgui/imgui.h"
+#include "../../3rdparty/imgui/backends/imgui_impl_sdl3.h"
+#include "../../3rdparty/imgui/backends/imgui_impl_vulkan.h"
 
 namespace VxEngine {
 

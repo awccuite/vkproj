@@ -1,15 +1,7 @@
 #pragma once
 
-#include <memory>
-#include <optional>
 #include <string>
-#include <vector>
-#include <span>
-#include <array>
-#include <functional>
-#include <deque>
 #include <iostream>
-#include <fstream>
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -22,7 +14,8 @@
 // #include <glm/mat4x4.hpp>
 // #include <glm/vec4.hpp>
 
-#include <vk_mem_alloc.h>
+// Full include because it doesnt fucking work.
+#include "../../3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
 #include "vx_image.hpp"
 
 namespace VxEngine {
