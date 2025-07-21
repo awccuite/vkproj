@@ -2,4 +2,4 @@
 /.vscode
 *.spv
 .clangd
-.mingw-gcc-toolchain.cmake
+mingw-gcc-toolchain.cmake
