@@ -1,4 +1,5 @@
 #include "vx_renderer.hpp"
+#include "vulkan/vulkan_core.h"
 
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_vulkan.h>
@@ -18,6 +19,8 @@
 #include "../../3rdparty/imgui/imgui.h"
 #include "../../3rdparty/imgui/backends/imgui_impl_sdl3.h"
 #include "../../3rdparty/imgui/backends/imgui_impl_vulkan.h"
+
+#include "../../3rdparty/glm/glm/glm.hpp"
 
 namespace VxEngine {
 
@@ -339,18 +342,27 @@ void VulkanRenderer::init_pipelines() {
     init_background_pipelines();
 }
 
+// Background compute pipeline.
 void VulkanRenderer::init_background_pipelines() {
-    VkPipelineLayoutCreateInfo computeLayoutInfo = {};
+    VkPipelineLayoutCreateInfo computeLayoutInfo = {}; // We create a push constant range, then add it to the layout. This tells the pipeline how to handle the push constants.
     computeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     computeLayoutInfo.pNext = nullptr;
     computeLayoutInfo.setLayoutCount = 1;
     computeLayoutInfo.pSetLayouts = &_descriptorManager.drawImageDescriptorLayout; // The descriptor layout currently owned by the descriptor manager.
 
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(ComputePushConstants);
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    computeLayoutInfo.pushConstantRangeCount = 1; // One push constant range
+    computeLayoutInfo.pPushConstantRanges = &pushConstantRange; // The push constant range.
+
     VX_CHECK(vkCreatePipelineLayout(_device, &computeLayoutInfo, nullptr, &_gradientPipelineLayout), "Compute pipeline layout creation failed.");
 
     VkShaderModule computeShaderModule;
     // Need to use relative to exe
-    if(!load_shader_module("src/renderer/shaders/gradient.comp.spv", _device, &computeShaderModule)) {
+    if(!load_shader_module("src/renderer/shaders/color_gradient.comp.spv", _device, &computeShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
@@ -585,12 +597,22 @@ void VulkanRenderer::draw_background(VkCommandBuffer commandBuffer) { // Clear t
     VkImageSubresourceRange clearRange = createImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     // Clear the image with our clearValue (should sinusoudally change colors per frame)
     vkCmdClearColorImage(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-
+        
     // Bind the compute gradient pipeline.
     // Bind the descriptor set containing the draw image.
     // Execute the compute pipeline.
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_descriptorManager.drawImageDescritptors, 0, nullptr);
+
+    // Create a push constant for the pipeline. 
+    ComputePushConstants pushConstants = {};
+    pushConstants.data1 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+    pushConstants.data3 = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+    pushConstants.data2 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // Blue
+    pushConstants.data4 = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // White
+    // Push the push constants to the pipeline.
+    vkCmdPushConstants(commandBuffer, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pushConstants);
+
     vkCmdDispatch(commandBuffer, std::ceil(_drawExtent.width / 16.0f), std::ceil(_drawExtent.height / 16.0f), 1);
 }
 

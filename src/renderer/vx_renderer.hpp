@@ -73,7 +73,8 @@ public:
 	AllocatedImage _drawImage;
 	VkExtent2D _drawExtent;
 
-	// Pipelines for now
+	// We will want to move to a pipeline manager system that allows hotswapping of pipelines
+	// in real time.
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
 

@@ -8,3 +8,6 @@
 	path = 3rdparty/imgui
 	url = git@github.com:awccuite/vk-imgui.git
 	branch = vk-renderer
+[submodule "3rdparty/glm"]
+	path = 3rdparty/glm
+	url = git@github.com:g-truc/glm.git
