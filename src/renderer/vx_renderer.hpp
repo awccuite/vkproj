@@ -103,6 +103,7 @@ private:
 
 	void draw();
 	void draw_background(VkCommandBuffer commandBuffer);
+	void draw_imgui(VkCommandBuffer commandBuffer, VkImageView imageView);
 
 	void print_vulkan_info();
 

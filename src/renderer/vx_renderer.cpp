@@ -519,25 +519,34 @@ void VulkanRenderer::draw() {
     VkCommandBuffer commandBuffer = get_current_frame_data()._commandBuffer;
     VX_CHECK(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer"); // Grab and reset the command buffer for the framedata at index.
 
-    // Begin command buffer
+    // Begin first draw pass.
     constexpr auto commandBufferBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo), "vkBeginCommandBuffer");
 
     // Transition the draw image to a general (unoptimized) layout.
     transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    draw_background(commandBuffer); // Draw background to general.
 
-    draw_background(commandBuffer); // Draw the background image to the drawImage. This is where the background shader is executed.
-
-    // After drawing, we need to transition the draw image to transfer source layout.
-    // We also need to transition the swapchain image to a transfer destination layout.
-    // Then we can copy the draw image to the swapchain image.
-    // Finally, we need to transition the swapchain image to a presentable layout.
+    // Transition the draw image to a transfer source layout.
     transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+    // Transition the swapchain image to a transfer destination layout.
     transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyImageToImage(commandBuffer, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent); // copy from draw image to swapchain.
-    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR); // transfer to presentable layout
+
+    // Copy the draw image to the swapchain image.
+    copyImageToImage(commandBuffer, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
+
+    // Transition the swapchain image to an attachment optimal layout for ImGui rendering.
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    
+    // Draw ImGui debug overlay directly to swapchain (bypasses post-processing).
+    draw_imgui(commandBuffer, _swapchainImageViews[swapchainImageIndex]);
+
+    // Transition the swapchain image to presentable layout.
+    transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VX_CHECK(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
+    // End imgui draw.
     // End the command buffer.
 
     VkCommandBufferSubmitInfo commandBufferSubmitInfo = createCommandBufferSubmitInfo(commandBuffer);
@@ -584,6 +593,15 @@ void VulkanRenderer::draw_background(VkCommandBuffer commandBuffer) { // Clear t
     vkCmdDispatch(commandBuffer, std::ceil(_drawExtent.width / 16.0f), std::ceil(_drawExtent.height / 16.0f), 1);
 }
 
+void VulkanRenderer::draw_imgui(VkCommandBuffer commandBuffer, VkImageView imageView) {
+    VkRenderingAttachmentInfo colorAttachment = createRenderingAttachmentInfo(imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo renderInfo = createRenderingInfo(_drawExtent, &colorAttachment, nullptr);
+
+    vkCmdBeginRendering(commandBuffer, &renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    vkCmdEndRendering(commandBuffer);
+}
+
 void VulkanRenderer::run() {
     std::cout << "Entering main loop" << std::endl;
 
@@ -607,7 +625,17 @@ void VulkanRenderer::run() {
                 std::cout << "Window restored" << std::endl;
                 _windowMinizmized = false;
             }
+
+            ImGui_ImplSDL3_ProcessEvent(&e); // Send event to imgui
         }
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
         
         draw();
     }

@@ -212,4 +212,35 @@ constexpr static VkImageViewCreateInfo createImageViewCreateInfo(VkFormat format
     return info;
 }
 
+constexpr static VkRenderingAttachmentInfo createRenderingAttachmentInfo(VkImageView view, VkClearValue* clear, VkImageLayout layout){
+    VkRenderingAttachmentInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    info.pNext = nullptr;
+
+    info.imageView = view;
+    info.imageLayout = layout;
+    info.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    if(clear){
+        info.clearValue = *clear;
+    }
+
+    return info;
+}
+
+constexpr static VkRenderingInfo createRenderingInfo(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment){
+    VkRenderingInfo renderInfo {};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.pNext = nullptr;
+
+    renderInfo.renderArea = VkRect2D { VkOffset2D { 0, 0 }, renderExtent };
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = colorAttachment;
+    renderInfo.pDepthAttachment = depthAttachment;
+    renderInfo.pStencilAttachment = nullptr;
+
+    return renderInfo;
+}
+
 } // namespace VxEngine 
