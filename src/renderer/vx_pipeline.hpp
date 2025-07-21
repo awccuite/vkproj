@@ -24,7 +24,7 @@ namespace VxEngine {
         VkPipelineLayout pipelineLayout;
         VkPipeline pipeline;
 
-        ComputePushConstants pushConstants;
+        ComputePushConstants data;
     };
 
     // Load a shader module from a file.

@@ -75,8 +75,11 @@ public:
 
 	// We will want to move to a pipeline manager system that allows hotswapping of pipelines
 	// in real time.
-	VkPipeline _gradientPipeline;
-	VkPipelineLayout _gradientPipelineLayout;
+	// VkPipeline _gradientPipeline;
+	VkPipelineLayout _backgroundComputePipelineLayout;
+
+	std::vector<ComputePipeline> _computePipelines;
+	int _currentComputePipeline = 0;
 
 	// ImGui Variables
 	VkFence _immFence;

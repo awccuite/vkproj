@@ -343,6 +343,9 @@ void VulkanRenderer::init_pipelines() {
 }
 
 // Background compute pipeline.
+
+// Our curent background compute shaders share a lot of similarities in their layouts,
+// so we can create a single layout as well as computePipelineCreateInfo for them to use.
 void VulkanRenderer::init_background_pipelines() {
     VkPipelineLayoutCreateInfo computeLayoutInfo = {}; // We create a push constant range, then add it to the layout. This tells the pipeline how to handle the push constants.
     computeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -357,12 +360,18 @@ void VulkanRenderer::init_background_pipelines() {
 
     computeLayoutInfo.pushConstantRangeCount = 1; // One push constant range
     computeLayoutInfo.pPushConstantRanges = &pushConstantRange; // The push constant range.
+    
+    // _backgroundComputePipelineLayout is currently a general layout for computes with a single push constant.
+    VX_CHECK(vkCreatePipelineLayout(_device, &computeLayoutInfo, nullptr, &_backgroundComputePipelineLayout), "Compute pipeline layout creation failed.");
 
-    VX_CHECK(vkCreatePipelineLayout(_device, &computeLayoutInfo, nullptr, &_gradientPipelineLayout), "Compute pipeline layout creation failed.");
-
-    VkShaderModule computeShaderModule;
+    VkShaderModule gradientShaderModule;
     // Need to use relative to exe
-    if(!load_shader_module("src/renderer/shaders/color_gradient.comp.spv", _device, &computeShaderModule)) { // Load the compute shader module.
+    if(!load_shader_module("src/renderer/shaders/color_gradient.comp.spv", _device, &gradientShaderModule)) { // Load the compute shader module.
+        throw std::runtime_error("Failed to load compute shader module");
+    }
+
+    VkShaderModule skyShaderModule;
+    if(!load_shader_module("src/renderer/shaders/sky.comp.spv", _device, &skyShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
@@ -370,22 +379,42 @@ void VulkanRenderer::init_background_pipelines() {
     computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     computeShaderStageInfo.pNext = nullptr;
     computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    computeShaderStageInfo.module = computeShaderModule;
+    computeShaderStageInfo.module = gradientShaderModule;
     computeShaderStageInfo.pName = "main";
 
     VkComputePipelineCreateInfo computePipelineInfo = {};
     computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     computePipelineInfo.pNext = nullptr;
     computePipelineInfo.stage = computeShaderStageInfo;
-    computePipelineInfo.layout = _gradientPipelineLayout;
+    computePipelineInfo.layout = _backgroundComputePipelineLayout;
 
-    VX_CHECK(vkCreateComputePipelines(_device, nullptr, 1, &computePipelineInfo, nullptr, &_gradientPipeline), "Compute pipeline creation failed.");
+    ComputePipeline gradientPipeline;
+    gradientPipeline.name = "gradient";
+    gradientPipeline.pipelineLayout = _backgroundComputePipelineLayout;
+    gradientPipeline.data.data1 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // R
+    gradientPipeline.data.data2 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // B
 
-    vkDestroyShaderModule(_device, computeShaderModule, nullptr);
+    VX_CHECK(vkCreateComputePipelines(_device, nullptr, 1, &computePipelineInfo, nullptr, &gradientPipeline.pipeline), "Compute pipeline creation failed.");
+
+    ComputePipeline skyPipeline;
+    skyPipeline.name = "sky";
+    skyPipeline.pipelineLayout = _backgroundComputePipelineLayout; // Use general layout for now.
+    skyPipeline.data.data1 = glm::vec4(0.1f, 0.2f, 0.4f, 0.97f);
+
+    VX_CHECK(vkCreateComputePipelines(_device, nullptr, 1, &computePipelineInfo, nullptr, &skyPipeline.pipeline), "Compute pipeline creation failed.");
+
+    vkDestroyShaderModule(_device, gradientShaderModule, nullptr);
+    vkDestroyShaderModule(_device, skyShaderModule, nullptr);
+
+    _computePipelines.push_back(gradientPipeline);
+    _computePipelines.push_back(skyPipeline);
 
     _engineDeletionManager.push_function([this]() {
-        vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
-        vkDestroyPipeline(_device, _gradientPipeline, nullptr);
+        vkDestroyPipelineLayout(_device, _backgroundComputePipelineLayout, nullptr);
+
+        for(auto& pipeline : _computePipelines) { // Destroy the compute pipelines :)
+            vkDestroyPipeline(_device, pipeline.pipeline, nullptr);
+        }
     });
 }
 
@@ -601,17 +630,10 @@ void VulkanRenderer::draw_background(VkCommandBuffer commandBuffer) { // Clear t
     // Bind the compute gradient pipeline.
     // Bind the descriptor set containing the draw image.
     // Execute the compute pipeline.
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_descriptorManager.drawImageDescritptors, 0, nullptr);
-
-    // Create a push constant for the pipeline. 
-    ComputePushConstants pushConstants = {};
-    pushConstants.data1 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
-    pushConstants.data3 = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-    pushConstants.data2 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); // Blue
-    pushConstants.data4 = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // White
-    // Push the push constants to the pipeline.
-    vkCmdPushConstants(commandBuffer, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pushConstants);
+    ComputePipeline& selected = _computePipelines[_currentComputePipeline];
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, selected.pipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _backgroundComputePipelineLayout, 0, 1, &_descriptorManager.drawImageDescritptors, 0, nullptr);
+    vkCmdPushConstants(commandBuffer, _backgroundComputePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &selected.data); // Push the push constant specific data.
 
     vkCmdDispatch(commandBuffer, std::ceil(_drawExtent.width / 16.0f), std::ceil(_drawExtent.height / 16.0f), 1);
 }
@@ -655,8 +677,20 @@ void VulkanRenderer::run() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-
-        ImGui::ShowDemoWindow();
+        if (ImGui::Begin("background")) {
+			
+			ComputePipeline& selected = _computePipelines[_currentComputePipeline];
+		
+			ImGui::Text("Selected effect: %s", selected.name.c_str());
+		
+			ImGui::SliderInt("Effect Index", &_currentComputePipeline,0, _computePipelines.size() - 1);
+		
+			ImGui::InputFloat4("data1",(float*)& selected.data.data1);
+			ImGui::InputFloat4("data2",(float*)& selected.data.data2);
+			ImGui::InputFloat4("data3",(float*)& selected.data.data3);
+			ImGui::InputFloat4("data4",(float*)& selected.data.data4);
+		}
+        ImGui::End();
 
         ImGui::Render();
         
