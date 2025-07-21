@@ -22,7 +22,7 @@
 // #include <glm/mat4x4.hpp>
 // #include <glm/vec4.hpp>
 
-#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
+#include <vk_mem_alloc.h>
 #include "vx_image.hpp"
 
 namespace VxEngine {

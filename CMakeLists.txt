@@ -20,7 +20,8 @@ find_package(PkgConfig REQUIRED)
 # Use pkg-config to find Vulkan
 pkg_check_modules(VULKAN REQUIRED vulkan)
 
-add_subdirectory(src/renderer/3rdparty/imgui)
+# Add 3rdparty dependencies
+add_subdirectory(3rdparty)
 
 # Convert Windows paths to Unix paths for MSYS2 environment
 string(REPLACE "C:" "/c" VULKAN_INCLUDE_DIRS_UNIX "${VULKAN_INCLUDE_DIRS}")
@@ -50,14 +51,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     "/c/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32"
     "/c/msys64/mingw64/include/c++/14.2.0/backward"
     "/c/msys64/mingw64/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/3rdparty/imgui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/renderer/3rdparty/imgui/backends"
 )
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    imgui
-    vk-bootstrap::vk-bootstrap
+    3rdparty
     Vulkan::Vulkan
     ${SDL3_LIBRARIES}
     renderer

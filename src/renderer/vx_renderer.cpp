@@ -1,22 +1,21 @@
 #include "vx_renderer.hpp"
+#include "vx_utils.hpp"
+#include "vx_deletionManager.hpp"
+#include "vx_descriptors.hpp"
 
-#include <chrono>
-#include <thread>
-#include <cassert>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <VkBootstrap.h>
+
 #include <iostream>
-#include <cmath>
+#include <optional>
+#include <vector>
+#include <vk_mem_alloc.h>
 
-#include "3rdparty/vk-bootstrap/src/VkBootstrap.h"
-#include "SDL3/SDL_events.h"
-#include "vulkan/vulkan_core.h"
-
-#define VMA_IMPLEMENTATION
-#include "3rdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h"
-
-// IMGUI
-#include "3rdparty/imgui/imgui.h"
-#include "3rdparty/imgui/backends/imgui_impl_sdl3.h"
-#include "3rdparty/imgui/backends/imgui_impl_vulkan.h"
+//imgui
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_vulkan.h>
 
 namespace VxEngine {
 
