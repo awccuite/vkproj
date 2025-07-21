@@ -46,7 +46,7 @@ public:
 	
 	// Engine control variables
 	bool _isInitialized = false;
-	bool _windowMinizmized = false;
+	bool _windowMinimized = false;
 	uint64_t _frameNumber = 0;
 
 	// Window variables

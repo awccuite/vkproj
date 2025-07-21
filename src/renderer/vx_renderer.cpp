@@ -501,7 +501,7 @@ void VulkanRenderer::cleanup() {
 
 void VulkanRenderer::draw() {
     // std::cout << "Drawing frame " << _frameNumber << std::endl;
-    if(_windowMinizmized) { // Limit FPS when window is minimized.
+    if(_windowMinimized) { // Limit FPS when window is minimized.
         std::this_thread::sleep_for(std::chrono::milliseconds(UNFOCUSED_FPS_LIMIT_MS));
     }
 
@@ -620,11 +620,11 @@ void VulkanRenderer::run() {
             
             if(e.type == SDL_EVENT_WINDOW_MINIMIZED){
                 std::cout << "Window minimized" << std::endl;
-                _windowMinizmized = true;
+                _windowMinimized = true;
             }
             if(e.type == SDL_EVENT_WINDOW_RESTORED){
                 std::cout << "Window restored" << std::endl;
-                _windowMinizmized = false;
+                _windowMinimized = false;
             }
 
             ImGui_ImplSDL3_ProcessEvent(&e); // Send event to imgui
