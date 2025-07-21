@@ -1,6 +1,9 @@
 #include "vx_pipeline.hpp"
 #include "vx_utils.hpp"
 
+#include <fstream>
+#include <iostream>
+#include <vector>
 
 bool VxEngine::load_shader_module(const char* filePath, VkDevice device, VkShaderModule* module){
     std::ifstream file(filePath, std::ios::ate | std::ios::binary);

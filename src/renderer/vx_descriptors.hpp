@@ -2,6 +2,9 @@
 
 #include "vx_utils.hpp"
 
+#include <vector>
+#include <span>
+
 // File for creating abstractions around descriptor sets and layouts.
 
 // This owns the allocator for descriptor sets,
