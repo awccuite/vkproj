@@ -1,5 +1,6 @@
 #include "vx_renderer.hpp"
 #include "vulkan/vulkan_core.h"
+#include "vx_utils.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_vulkan.h>
@@ -340,6 +341,7 @@ void VulkanRenderer::init_descriptors() {
 
 void VulkanRenderer::init_pipelines() {
     init_background_pipelines();
+    init_triangle_pipeline();
 }
 
 // Background compute pipeline.
@@ -415,6 +417,54 @@ void VulkanRenderer::init_background_pipelines() {
         for(auto& pipeline : _computePipelines) { // Destroy the compute pipelines :)
             vkDestroyPipeline(_device, pipeline.pipeline, nullptr);
         }
+    });
+}
+
+void VulkanRenderer::init_triangle_pipeline() {
+    VkShaderModule triangleFragShader;
+    if(!load_shader_module("src/renderer/shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
+        std::cout << "Failed to load triangle fragment shader" << std::endl;
+    } else {
+        std::cout << "Loaded triangle fragment shader" << std::endl;
+    }
+
+    VkShaderModule triangleVertShader;
+    if(!load_shader_module("src/renderer/shaders/colored_triangle.vert.spv", _device, &triangleVertShader)) {
+        std::cout << "Failed to load triangle vertex shader" << std::endl;
+    } else {
+        std::cout << "Loaded triangle vertex shader" << std::endl;
+    }
+    
+    // Create empty layout as this shader takes no inputs.
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = pipelineLayoutCreateInfo();
+    VX_CHECK(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_trianglePipelineLayout), "Failed to create triangle pipeline layout");
+
+    PipelineBuilder pipelineBuilder;
+    pipelineBuilder._layout = _trianglePipelineLayout;
+
+    pipelineBuilder.add_shader_stage(VK_SHADER_STAGE_VERTEX_BIT, triangleVertShader, "main");
+    pipelineBuilder.add_shader_stage(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader, "main");
+
+    pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    
+    pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
+
+    pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipelineBuilder.set_multisampling_none();
+    pipelineBuilder.disable_blending();
+    pipelineBuilder.disable_depth_test();
+
+    pipelineBuilder.set_color_attachment_format(_drawImage.format);
+    pipelineBuilder.set_depth_format(VK_FORMAT_UNDEFINED);
+
+    _trianglePipeline = pipelineBuilder.build_pipeline(_device);
+
+    vkDestroyShaderModule(_device, triangleFragShader, nullptr);
+    vkDestroyShaderModule(_device, triangleVertShader, nullptr);
+
+    _engineDeletionManager.push_function([this]() {
+        vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
+        vkDestroyPipeline(_device, _trianglePipeline, nullptr);
     });
 }
 
@@ -565,15 +615,20 @@ void VulkanRenderer::draw() {
     constexpr auto commandBufferBeginInfo = beginCommandBufferInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VX_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo), "vkBeginCommandBuffer");
 
-    // Transition the draw image to a general (unoptimized) layout.
+    // Transition the draw image to a general layout.
     transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     draw_background(commandBuffer); // Draw background to general.
 
     // Transition the draw image to a transfer source layout.
-    transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    draw_geometry(commandBuffer);
 
     // Transition the swapchain image to a transfer destination layout.
     transitionImageLayout(commandBuffer, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+     // Transition draw image to transfer source.
+    transitionImageLayout(commandBuffer, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     // Copy the draw image to the swapchain image.
     copyImageToImage(commandBuffer, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
@@ -644,6 +699,32 @@ void VulkanRenderer::draw_imgui(VkCommandBuffer commandBuffer, VkImageView image
 
     vkCmdBeginRendering(commandBuffer, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    vkCmdEndRendering(commandBuffer);
+}
+
+void VulkanRenderer::draw_geometry(VkCommandBuffer commandBuffer) {
+    VkRenderingAttachmentInfo colorAttachment = createRenderingAttachmentInfo(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo = createRenderingInfo(_drawExtent, &colorAttachment, nullptr);
+    vkCmdBeginRendering(commandBuffer, &renderInfo);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(_drawExtent.width);
+    viewport.height = static_cast<float>(_drawExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = { VkOffset2D { 0, 0 }, _drawExtent };
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
     vkCmdEndRendering(commandBuffer);
 }
 

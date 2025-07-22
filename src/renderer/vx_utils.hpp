@@ -236,7 +236,7 @@ constexpr static VkRenderingInfo createRenderingInfo(VkExtent2D renderExtent, Vk
     return renderInfo;
 }
 
-VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint) {
+constexpr static VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint) {
     VkPipelineShaderStageCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		info.pNext = nullptr;
@@ -248,6 +248,20 @@ VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(VkShaderStageFlagBit
 		//the entry point of the shader
 		info.pName = "main";
 		return info;
+}
+
+constexpr static VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo() {
+    VkPipelineLayoutCreateInfo info {};
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    info.pNext = nullptr;
+
+    // empty defaults
+    info.flags = 0;
+    info.setLayoutCount = 0;
+    info.pSetLayouts = nullptr;
+    info.pushConstantRangeCount = 0;
+    info.pPushConstantRanges = nullptr;
+    return info;
 }
 
 } // namespace VxEngine 

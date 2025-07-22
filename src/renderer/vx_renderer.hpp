@@ -81,6 +81,9 @@ public:
 	std::vector<ComputePipeline> _computePipelines;
 	int _currentComputePipeline = 0;
 
+	VkPipelineLayout _trianglePipelineLayout;
+	VkPipeline _trianglePipeline;
+
 	// ImGui Variables
 	VkFence _immFence;
     VkCommandBuffer _immCommandBuffer;
@@ -101,6 +104,7 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
+	void init_triangle_pipeline();
 	void init_imgui();
 
 	void cleanup_vk_objects();
@@ -108,6 +112,7 @@ private:
 	void draw();
 	void draw_background(VkCommandBuffer commandBuffer);
 	void draw_imgui(VkCommandBuffer commandBuffer, VkImageView imageView);
+	void draw_geometry(VkCommandBuffer commandBuffer);
 
 	void print_vulkan_info();
 
