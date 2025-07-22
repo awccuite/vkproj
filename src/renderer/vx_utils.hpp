@@ -236,4 +236,18 @@ constexpr static VkRenderingInfo createRenderingInfo(VkExtent2D renderExtent, Vk
     return renderInfo;
 }
 
+VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* entryPoint) {
+    VkPipelineShaderStageCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		info.pNext = nullptr;
+
+		//shader stage
+		info.stage = stage;
+		//module containing the code for this shader stage
+		info.module = module;
+		//the entry point of the shader
+		info.pName = "main";
+		return info;
+}
+
 } // namespace VxEngine 
