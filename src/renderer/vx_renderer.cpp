@@ -1,6 +1,7 @@
 #include "vx_renderer.hpp"
 #include "vulkan/vulkan_core.h"
 #include "vx_utils.hpp"
+#include "vx_buffers.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_vulkan.h>
@@ -171,7 +172,7 @@ void VulkanRenderer::init_vulkan() {
     });
 }
 
-void VulkanRenderer::create_swapchain(/*uint32_t width, uint32_t height*/) {
+void VulkanRenderer::create_swapchain() {
     vkb::SwapchainBuilder swapchainBuilder(_physicalDevice, _device, _surface);
 
     _swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
@@ -490,13 +491,8 @@ void VulkanRenderer::init_imgui() {
     
         VkDescriptorPool imguiPool;
         VX_CHECK(vkCreateDescriptorPool(_device, &pool_info, nullptr, &imguiPool), "failed to create imgui descriptor pool");
-    
-        // 2: initialize imgui library
-    
-        // this initializes the core structures of imgui
+        
         ImGui::CreateContext();
-    
-        // this initializes imgui for SDL
         ImGui_ImplSDL3_InitForVulkan(_window);
     
         // this initializes imgui for Vulkan
@@ -772,7 +768,6 @@ void VulkanRenderer::run() {
 			ImGui::InputFloat4("data4",(float*)& selected.data.data4);
 		}
         ImGui::End();
-
         ImGui::Render();
         
         draw();
