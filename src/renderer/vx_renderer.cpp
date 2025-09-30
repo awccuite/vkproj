@@ -22,7 +22,10 @@
 #include "../../3rdparty/imgui/backends/imgui_impl_sdl3.h"
 #include "../../3rdparty/imgui/backends/imgui_impl_vulkan.h"
 
+#ifndef GLM_INCLUDE
+#define GLM_INCLUDE
 #include "../../3rdparty/glm/glm/glm.hpp"
+#endif
 
 namespace VxEngine {
 
