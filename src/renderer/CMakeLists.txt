@@ -10,6 +10,8 @@ add_library(renderer STATIC
     vx_descriptors.cpp
     vx_pipeline.hpp
     vx_pipeline.cpp
+    vx_buffers.hpp
+    vx_buffers.cpp
 )
 
 # Convert Windows paths to Unix paths if needed
