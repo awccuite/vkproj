@@ -372,12 +372,12 @@ void VulkanRenderer::init_background_pipelines() {
 
     VkShaderModule gradientShaderModule;
     // Need to use relative to exe
-    if(!load_shader_module("src/renderer/shaders/color_gradient.comp.spv", _device, &gradientShaderModule)) { // Load the compute shader module.
+    if(!load_shader_module("shaders/color_gradient.comp.spv", _device, &gradientShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
     VkShaderModule skyShaderModule;
-    if(!load_shader_module("src/renderer/shaders/sky.comp.spv", _device, &skyShaderModule)) { // Load the compute shader module.
+    if(!load_shader_module("shaders/sky.comp.spv", _device, &skyShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
@@ -426,14 +426,14 @@ void VulkanRenderer::init_background_pipelines() {
 
 void VulkanRenderer::init_triangle_pipeline() {
     VkShaderModule triangleFragShader;
-    if(!load_shader_module("src/renderer/shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
+    if(!load_shader_module("shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
         std::cout << "Failed to load triangle fragment shader" << std::endl;
     } else {
         std::cout << "Loaded triangle fragment shader" << std::endl;
     }
 
     VkShaderModule triangleVertShader;
-    if(!load_shader_module("src/renderer/shaders/colored_triangle.vert.spv", _device, &triangleVertShader)) {
+    if(!load_shader_module("shaders/colored_triangle.vert.spv", _device, &triangleVertShader)) {
         std::cout << "Failed to load triangle vertex shader" << std::endl;
     } else {
         std::cout << "Loaded triangle vertex shader" << std::endl;
