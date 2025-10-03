@@ -6,7 +6,10 @@
 #include <string>
 #include <vector>
 
+#ifndef GLM_INCLUDE
+#define GLM_INCLUDE
 #include "../../3rdparty/glm/glm/glm.hpp"
+#endif
 
 namespace VxEngine {
 

@@ -1,6 +1,7 @@
 #include "vx_renderer.hpp"
 #include "vulkan/vulkan_core.h"
 #include "vx_utils.hpp"
+#include "vx_buffers.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_vulkan.h>
@@ -21,7 +22,10 @@
 #include "../../3rdparty/imgui/backends/imgui_impl_sdl3.h"
 #include "../../3rdparty/imgui/backends/imgui_impl_vulkan.h"
 
+#ifndef GLM_INCLUDE
+#define GLM_INCLUDE
 #include "../../3rdparty/glm/glm/glm.hpp"
+#endif
 
 namespace VxEngine {
 
@@ -171,7 +175,7 @@ void VulkanRenderer::init_vulkan() {
     });
 }
 
-void VulkanRenderer::create_swapchain(/*uint32_t width, uint32_t height*/) {
+void VulkanRenderer::create_swapchain() {
     vkb::SwapchainBuilder swapchainBuilder(_physicalDevice, _device, _surface);
 
     _swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
@@ -368,12 +372,12 @@ void VulkanRenderer::init_background_pipelines() {
 
     VkShaderModule gradientShaderModule;
     // Need to use relative to exe
-    if(!load_shader_module("src/renderer/shaders/color_gradient.comp.spv", _device, &gradientShaderModule)) { // Load the compute shader module.
+    if(!load_shader_module("shaders/color_gradient.comp.spv", _device, &gradientShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
     VkShaderModule skyShaderModule;
-    if(!load_shader_module("src/renderer/shaders/sky.comp.spv", _device, &skyShaderModule)) { // Load the compute shader module.
+    if(!load_shader_module("shaders/sky.comp.spv", _device, &skyShaderModule)) { // Load the compute shader module.
         throw std::runtime_error("Failed to load compute shader module");
     }
 
@@ -422,14 +426,14 @@ void VulkanRenderer::init_background_pipelines() {
 
 void VulkanRenderer::init_triangle_pipeline() {
     VkShaderModule triangleFragShader;
-    if(!load_shader_module("src/renderer/shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
+    if(!load_shader_module("shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
         std::cout << "Failed to load triangle fragment shader" << std::endl;
     } else {
         std::cout << "Loaded triangle fragment shader" << std::endl;
     }
 
     VkShaderModule triangleVertShader;
-    if(!load_shader_module("src/renderer/shaders/colored_triangle.vert.spv", _device, &triangleVertShader)) {
+    if(!load_shader_module("shaders/colored_triangle.vert.spv", _device, &triangleVertShader)) {
         std::cout << "Failed to load triangle vertex shader" << std::endl;
     } else {
         std::cout << "Loaded triangle vertex shader" << std::endl;
@@ -490,13 +494,8 @@ void VulkanRenderer::init_imgui() {
     
         VkDescriptorPool imguiPool;
         VX_CHECK(vkCreateDescriptorPool(_device, &pool_info, nullptr, &imguiPool), "failed to create imgui descriptor pool");
-    
-        // 2: initialize imgui library
-    
-        // this initializes the core structures of imgui
+        
         ImGui::CreateContext();
-    
-        // this initializes imgui for SDL
         ImGui_ImplSDL3_InitForVulkan(_window);
     
         // this initializes imgui for Vulkan
@@ -772,7 +771,6 @@ void VulkanRenderer::run() {
 			ImGui::InputFloat4("data4",(float*)& selected.data.data4);
 		}
         ImGui::End();
-
         ImGui::Render();
         
         draw();
