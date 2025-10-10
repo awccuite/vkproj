@@ -114,6 +114,11 @@ private:
 	void draw_imgui(VkCommandBuffer commandBuffer, VkImageView imageView);
 	void draw_geometry(VkCommandBuffer commandBuffer);
 
+	// Buffer management methods
+	AllocatedBuffer create_buffer(size_t allocationSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroy_buffer(const AllocatedBuffer& buffer);
+	GPUMeshBuffer upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
 	void print_vulkan_info();
 
 	void create_swapchain();

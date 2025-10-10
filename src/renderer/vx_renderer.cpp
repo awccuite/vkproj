@@ -727,6 +727,51 @@ void VulkanRenderer::draw_geometry(VkCommandBuffer commandBuffer) {
     vkCmdEndRendering(commandBuffer);
 }
 
+AllocatedBuffer VulkanRenderer::create_buffer(size_t allocationSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage){
+    VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    bufferInfo.pNext = nullptr;
+    bufferInfo.size = allocationSize;
+
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage = memoryUsage;
+    vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    AllocatedBuffer newBuffer;
+    VX_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocationInfo), "create_buffer");
+
+    return newBuffer;
+}
+
+void VulkanRenderer::destroy_buffer(const AllocatedBuffer& buffer){
+    vmaDestroyBuffer(_allocator, buffer.buffer, buffer.allocation);
+}
+
+GPUMeshBuffer VulkanRenderer::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices){
+    const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+    const size_t indexBufferSize = indices.size() * sizeof(Indice);
+
+    GPUMeshBuffer newSurface;
+    newSurface.vertexBuffer = create_buffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY); // Create GPU side buffers. It is a storage buffer, that can be transferred, and has a device address.
+
+    VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newSurface.vertexBuffer.buffer };
+    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(_device, &deviceAddressInfo); // Get the buffer device address for our GPUMeshBuffer.
+
+    // Now, write data to buffers.
+    // First, we load our data in a staging buffer. Then, we copy it to our surface and submit. Then, we destroy the CPU side repr.
+    AllocatedBuffer staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+    void* data = staging.allocation->GetMappedData();
+
+    memcpy(data, vertices.data(), vertexBufferSize);
+    memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+    
+    // TODO
+    // Continue here on immediate_submit
+}
+
 void VulkanRenderer::run() {
     std::cout << "Entering main loop" << std::endl;
 

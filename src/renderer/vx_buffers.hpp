@@ -1,5 +1,7 @@
 #pragma once
 
+// Structs for mesh data
+
 #include "vx_utils.hpp"
 
 #ifndef GLM_INCLUDE
@@ -9,11 +11,13 @@
 
 namespace VxEngine {
 
+typedef uint32_t Indice;
+
 // CPU Side representation of allocated buffer
 struct AllocatedBuffer {
-    VkBuffer _buffer; // Vulkan buffer handle
-    VmaAllocation _allocation; // Metadata for the buffer and its allocation. Used to free the buffer.
-    VmaAllocationInfo _allocationInfo;
+    VkBuffer buffer; // Vulkan buffer handle
+    VmaAllocation allocation; // Metadata for the buffer and its allocation. Used to free the buffer.
+    VmaAllocationInfo allocationInfo;
 };
 
 // GPU Side Structs
@@ -36,8 +40,8 @@ struct GPUDrawPushConstants {
     VkDeviceAddress vertexBuffer;
 };
 
-AllocatedBuffer create_buffer(size_t allocationSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VmaAllocator& allocator);
+// AllocatedBuffer create_buffer(size_t allocationSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VmaAllocator& allocator);
 
-void destroy_buffer(const AllocatedBuffer& buffer, VmaAllocator& allocator);
+// void destroy_buffer(const AllocatedBuffer& buffer, VmaAllocator& allocator);
 
 } // namespace VxEngine
